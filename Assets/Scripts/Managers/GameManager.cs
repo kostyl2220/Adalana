@@ -5,6 +5,11 @@ using UnityEngine.Networking;
 using System.Collections.Generic;
 using Prototype.NetworkLobby;
 
+public enum TestTypes
+{
+    ARRANGE
+};
+
 public class GameManager : NetworkBehaviour
 {
     static public GameManager s_Instance;
@@ -21,6 +26,9 @@ public class GameManager : NetworkBehaviour
     [SyncVar]
     public bool m_GameIsFinished = false;
 
+    [SyncVar]
+    public bool m_answerSelected = false;
+
     //Various UI references to hide the screen between rounds.
     [Space]
     [Header("UI")]
@@ -34,6 +42,8 @@ public class GameManager : NetworkBehaviour
     private PlayerManager m_RoundWinner;          // Reference to the winner of the current round.  Used to make an announcement of who won.
     private PlayerManager m_GameWinner;           // Reference to the winner of the game.  Used to make an announcement of who won.
     private PlayerManager m_localPlayer;
+    private List<TestModule> m_testModules;
+    private TestModule m_currentTest;
 
     void Awake()
     {
@@ -49,6 +59,24 @@ public class GameManager : NetworkBehaviour
                 m_localPlayer = player;
                 return;
             }
+        }
+    }
+
+    [ClientRpc]
+    public void RpcSetupGame()
+    {
+        SetupLocalPlayer();
+        RpcSetupPlayerName();
+        SetupModules();
+    }
+
+    public void SetupModules()
+    {
+        m_testModules = new List<TestModule>();
+        foreach (Transform module in transform)
+        {
+            ArrangeTestModule atm = module.GetComponent<ArrangeTestModule>();
+            m_testModules.Add(atm);
         }
     }
 
@@ -102,14 +130,10 @@ public class GameManager : NetworkBehaviour
     // This is called from start and will run each phase of the game one after another. ONLY ON SERVER (as Start is only called on server)
     private IEnumerator GameLoop()
     {
-        while (m_Players.Count < 1)
-            yield return null;
+        /*while (m_Players.Count < 1)
+            yield return null;*/
 
-        SetupLocalPlayer();
-        SetupGame();
-
-        //wait to be sure that all are ready to start
-        yield return new WaitForSeconds(2.0f);
+        RpcSetupGame();
 
         // Start off by running the 'RoundStarting' coroutine but don't return until it's finished.
         yield return StartCoroutine(RoundStarting());
@@ -146,7 +170,6 @@ public class GameManager : NetworkBehaviour
                 {
                     flooredWaitTime = newFlooredWaitTime;
                     string message = EndMessage(flooredWaitTime);
-                    RpcUpdateMessage(message);
                 }
             }
 
@@ -165,7 +188,7 @@ public class GameManager : NetworkBehaviour
     {
         //we notify all clients that the round is starting
         RpcRoundStarting();
-
+        m_answerSelected = false;
         // Wait for the specified length of time until yielding control back to the game loop.
         yield return m_StartWait;
     }
@@ -176,11 +199,22 @@ public class GameManager : NetworkBehaviour
         // As soon as the round starts reset the tanks and make sure they can't move.
         ResetAll();
 
+        m_currentTest = m_testModules[(int)TestTypes.ARRANGE];
+        List<Variant> vars = new List<Variant>
+            {
+             new Variant("Hello", 1)
+            , new Variant("World", 2)
+            , new Variant("How are", 3)
+            , new Variant("you?", 4)
+        };
+
+        m_currentTest.SetupTest(vars);
+        m_currentTest.ActivateScene(true);
         // Increment the round number and display text showing the players what round it is.
         m_RoundNumber++;
         m_hud.SetRound(m_RoundNumber);
 
-        StartCoroutine(ClientRoundStartingFade());
+        //StartCoroutine(ClientRoundStartingFade());
     }
 
     private IEnumerator ClientRoundStartingFade()
@@ -216,11 +250,18 @@ public class GameManager : NetworkBehaviour
         // While there is not one tank left...
         while (remainingTime > 0)
         {
+            if (m_answerSelected)
+            {
+                break;
+            }
+
             RpcUpdateTime(remainingTime);
             remainingTime -= Time.deltaTime;
             // ... return on the next frame.
             yield return null;
         }
+
+        RpcUpdateScore();
     }
 
     [ClientRpc]
@@ -261,8 +302,6 @@ public class GameManager : NetworkBehaviour
         // Now the winner's score has been incremented, see if someone has one the game.
         m_GameWinner = GetGameWinner();
 
-        RpcUpdateMessage(EndMessage(0));
-
         //notify client they should disable tank control
         RpcRoundEnding();
 
@@ -273,13 +312,8 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void RpcRoundEnding()
     {
-        StartCoroutine(ClientRoundEndingFade());
-    }
-
-    [ClientRpc]
-    private void RpcUpdateMessage(string msg)
-    {
-        m_MessageText.text = msg;
+        m_currentTest.ActivateScene(false);
+        //StartCoroutine(ClientRoundEndingFade());
     }
 
     private IEnumerator ClientRoundEndingFade()
@@ -295,7 +329,8 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    private void SetupGame()
+    [ClientRpc]
+    private void RpcSetupPlayerName()
     {
         m_hud.SetName(m_localPlayer.GetName());
     }
@@ -389,5 +424,19 @@ public class GameManager : NetworkBehaviour
 
     private void ResetAll()
     {
+    }
+
+    public void CheckAnswers()
+    {
+        RpcCheckAnswers(m_localPlayer);
+    }
+
+    [ClientRpc]
+    public void RpcCheckAnswers(PlayerManager player)
+    {
+        List<int> answers = new List<int> { 1, 2, 3, 4 };
+        int score = m_currentTest.GetScore(answers);
+        player.m_Wins += score;
+        m_answerSelected = true;
     }
 }
