@@ -37,24 +37,6 @@ public class PlayerSetup : NetworkBehaviour
 
         if (!isServer) //if not hosting, we had the tank to the gamemanger for easy access!
             GameManager.AddTank(gameObject, m_PlayerNumber, m_Color, m_PlayerName, m_LocalID);
-
-        GameObject m_TankRenderers = transform.Find("TankRenderers").gameObject;
-
-        // Get all of the renderers of the tank.
-        Renderer[] renderers = m_TankRenderers.GetComponentsInChildren<Renderer>();
-
-        // Go through all the renderers...
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            // ... set their material color to the color specific to this tank.
-            renderers[i].material.color = m_Color;
-        }
-
-        if (m_TankRenderers)
-            m_TankRenderers.SetActive(false);
-
-        m_NameText.text = "<color=#" + ColorUtility.ToHtmlStringRGB(m_Color) + ">" + m_PlayerName + "</color>";
-        m_Crown.SetActive(false);
     }
 
     [ClientCallback]

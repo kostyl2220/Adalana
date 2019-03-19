@@ -40,11 +40,29 @@ public class AnswerInitializer : MonoBehaviour
             m_variants[i].gameObject.SetActive(false);
         }
 
+        vars = ShuffleList(vars);
+
         for (int i = 0; i < count; ++i)
         {
             m_variants[i].gameObject.SetActive(true);
             m_variants[i].ResetCell();
             m_variants[i].Setup(vars[i]);
         }
+    }
+
+    private List<E> ShuffleList<E>(List<E> inputList)
+    {
+        List<E> randomList = new List<E>();
+
+        System.Random r = new System.Random();
+        int randomIndex = 0;
+        while (inputList.Count > 0)
+        {
+            randomIndex = r.Next(0, inputList.Count); //Choose a random object in the list
+            randomList.Add(inputList[randomIndex]); //add it to the new, random list
+            inputList.RemoveAt(randomIndex); //remove to avoid duplicates
+        }
+
+        return randomList; //return the new random list
     }
 }
