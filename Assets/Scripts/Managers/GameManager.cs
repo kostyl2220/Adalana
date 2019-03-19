@@ -212,7 +212,8 @@ public class GameManager : NetworkBehaviour
         {
             //notify clients that the round is now started, they should allow player to move.
             RpcRoundPlaying();
-
+            Debug.Log(i);
+            m_answerSelected = false;
             float remainingTime = 30.0f;
             // While there is not one tank left...
             while (remainingTime > 0 && !m_answerSelected)
@@ -371,18 +372,19 @@ public class GameManager : NetworkBehaviour
 
     public void CheckAnswers()
     {
-        //RpcCheckAnswers(m_localPlayerID);
+        RpcCheckAnswers(m_localPlayerID);
     }
 
-    /*[ClientRpc]
+    [ClientRpc]
     public void RpcCheckAnswers(int playerID)
     {
+        PlayerManager player = m_Players[playerID];
         Debug.Log("Answered");
         List<int> answers = new List<int> { 1, 2, 3, 4 };
         int score = m_currentTest.GetScore(answers);
         player.m_Wins += score;
         m_answerSelected = true;
-    }*/
+    }
 
     private void ResetAll()
     {
