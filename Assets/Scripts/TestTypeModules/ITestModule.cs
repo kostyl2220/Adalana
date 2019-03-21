@@ -17,5 +17,5 @@ public abstract class TestModule : MonoBehaviour
         m_testScene.SetActive(activate);
     }
 
-    public abstract void SetupTest(List<Variant> vars, int answerCount = 1);
+    public abstract void SetupTest(Test test);
 }

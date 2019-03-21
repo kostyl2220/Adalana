@@ -5,11 +5,6 @@ using UnityEngine.Networking;
 using System.Collections.Generic;
 using Prototype.NetworkLobby;
 
-public enum TestTypes
-{
-    ARRANGE
-};
-
 public class GameManager : NetworkBehaviour
 {
     static public GameManager s_Instance;
@@ -20,7 +15,6 @@ public class GameManager : NetworkBehaviour
     public int m_NumRoundsToWin = 5;          // The number of rounds a single player has to win to win the game.
     public float m_StartDelay = 3f;           // The delay between the start of RoundStarting and RoundPlaying phases.
     public float m_EndDelay = 3f;             // The delay between the end of RoundPlaying and RoundEnding phases.
-    public Text m_MessageText;                // Reference to the overlay Text to display winning text, etc.
 
     [HideInInspector]
     [SyncVar]
@@ -35,7 +29,6 @@ public class GameManager : NetworkBehaviour
     public CanvasGroup m_EndRoundScreen;
     public HUD m_hud;
 
-    private int m_RoundNumber;                  // Which round the game is currently on.
     private WaitForSeconds m_StartWait;         // Used to have a delay whilst the round starts.
     private WaitForSeconds m_EndWait;           // Used to have a delay whilst the round or game ends.
     private PlayerManager m_RoundWinner;          // Reference to the winner of the current round.  Used to make an announcement of who won.
@@ -43,18 +36,73 @@ public class GameManager : NetworkBehaviour
     private int m_localPlayerID;
     private List<TestModule> m_testModules;
     private TestModule m_currentTest;
+    private TestsList m_currentTestList;
 
     void Awake()
     {
         s_Instance = this;
     }
 
-    [ClientRpc]
+    private void Hack_SetupTestList()
+    {
+        m_currentTestList = new TestsList();
+
+        List<Variant> vars1 = new List<Variant>
+            {
+             new Variant("Hello", 1)
+            , new Variant("World", 2)
+            , new Variant("How are", 3)
+            , new Variant("you?", 4)
+        };
+
+        List<int> answers1 = new List<int>{ 1, 2, 3, 4 };
+
+        Test test1 = new Test
+        {
+            m_type = TestTypes.ARRANGE,
+            m_question = "Combine first program correctly",
+            m_answerTime = 15.0f,
+            m_variants = vars1,
+            m_answers = answers1
+        };
+
+        List<Variant> vars2 = new List<Variant>
+            {
+             new Variant("Lol", 1)
+            , new Variant("Kek", 2)
+            , new Variant("Chebu", 3)
+            , new Variant("Rek", 4)
+        };
+
+        List<int> answers2 = new List<int> { 1, 2, 3, 4 };
+
+        Test test2 = new Test
+        {
+            m_type = TestTypes.ARRANGE,
+            m_question = "Piu",
+            m_answerTime = 12.0f,
+            m_variants = vars2,
+            m_answers = answers2
+        };
+
+        m_currentTestList.m_countOfRounds = 2;
+        m_currentTestList.m_countQuestionsInRound = 5;
+        for (int i = 0; i < 5; ++i)
+        {
+            m_currentTestList.m_tests.Add(test1);
+            m_currentTestList.m_tests.Add(test2);
+        }
+
+        m_currentTestList.InitTests();
+    }
+
+    //[ClientRpc]
     public void RpcSetupGame()
     {
         SetupLocalPlayerID();
         RpcSetupPlayerName();
         SetupModules();
+        Hack_SetupTestList();
     }
 
     private void SetupLocalPlayerID()
@@ -139,13 +187,15 @@ public class GameManager : NetworkBehaviour
 
         RpcSetupGame();
 
-        // Start off by running the 'RoundStarting' coroutine but don't return until it's finished.
-        yield return StartCoroutine(RoundStarting());
-        // Once the 'RoundStarting' coroutine is finished, run the 'RoundPlaying' coroutine but don't return until it's finished.
-        yield return StartCoroutine(RoundPlaying());      
-        // Once execution has returned here, run the 'RoundEnding' coroutine.
-        yield return StartCoroutine(RoundEnding());
-
+        while (m_currentTestList.IsRoundAvaliable())
+        {
+            // Start off by running the 'RoundStarting' coroutine but don't return until it's finished.
+            yield return StartCoroutine(RoundStarting());
+            // Once the 'RoundStarting' coroutine is finished, run the 'RoundPlaying' coroutine but don't return until it's finished.
+            yield return StartCoroutine(RoundPlaying());
+            // Once execution has returned here, run the 'RoundEnding' coroutine.
+            yield return StartCoroutine(RoundEnding());
+        }
         // This code is not run until 'RoundEnding' has finished.  At which point, check if there is a winner of the game.
         if (m_GameWinner != null)
         {// If there is a game winner, wait for certain amount or all player confirmed to start a game again
@@ -179,12 +229,9 @@ public class GameManager : NetworkBehaviour
         }
         else
         {
-            // If there isn't a winner yet, restart this coroutine so the loop continues.
-            // Note that this coroutine doesn't yield.  This means that the current version of the GameLoop will end.
             StartCoroutine(GameLoop());
         }
     }
-
 
     private IEnumerator RoundStarting()
     {
@@ -201,20 +248,17 @@ public class GameManager : NetworkBehaviour
         // As soon as the round starts reset the tanks and make sure they can't move.
         ResetAll();
         // Increment the round number and display text showing the players what round it is.
-        m_RoundNumber++;
-        m_hud.SetRound(m_RoundNumber);
+        m_hud.SetRound(m_currentTestList.GetCurrentRound());
     }
 
     private IEnumerator RoundPlaying()
-    {
-        int COUNT_OF_ANSWERS = 10;
-        for (int i = 0; i < COUNT_OF_ANSWERS; ++i)
+    {     
+        while (m_currentTestList.HasValidQuestionForRound())
         {
-            //notify clients that the round is now started, they should allow player to move.
-            RpcRoundPlaying();
-            Debug.Log(i);
+            RpcTestPlaying();
+
             m_answerSelected = false;
-            float remainingTime = 30.0f;
+            float remainingTime = m_currentTestList.GetCurrentTest().m_answerTime;
             // While there is not one tank left...
             while (remainingTime > 0 && !m_answerSelected)
             {
@@ -223,37 +267,53 @@ public class GameManager : NetworkBehaviour
                 // ... return on the next frame.
                 yield return null;
             }
+            RpcTestAnswered();
             RpcUpdateScore();
+            yield return null;
         }
     }
 
     [ClientRpc]
     void RpcUpdateTime(float time)
     {
-        m_hud.SetTime(time.ToString());
+        m_hud.SetTime(time);
     }
 
-    //[ClientRpc]
+    [ClientRpc]
     private void RpcUpdateScore()
     {
         m_hud.SetScore(m_Players[0].m_Wins, m_Players.Count == 2 ? m_Players[1].m_Wins : 0);
     }
 
+    void UpdateQuestion(string question)
+    {
+        m_hud.SetQuestion(question);
+    }
+
+    void UpdateQuestion(int question)
+    {
+        m_hud.SetQuestion(question);
+    }
+
     [ClientRpc]
-    void RpcRoundPlaying()
+    void RpcTestPlaying()
     {
         m_answerSelected = false;
-        m_currentTest = m_testModules[(int)TestTypes.ARRANGE];
-        List<Variant> vars = new List<Variant>
-            {
-             new Variant("Hello", 1)
-            , new Variant("World", 2)
-            , new Variant("How are", 3)
-            , new Variant("you?", 4)
-        };
-
-        m_currentTest.SetupTest(vars);
+        Test currentTest = m_currentTestList.GetCurrentTest();
+        
+        m_currentTest = m_testModules[(int)currentTest.m_type];
         m_currentTest.ActivateScene(true);
+        m_currentTest.SetupTest(currentTest);
+
+        UpdateQuestion(currentTest.m_question);
+        UpdateQuestion(m_currentTestList.GetCurrentQuestionNumber());
+    }
+
+    [ClientRpc]
+    void RpcTestAnswered()
+    {
+        m_currentTestList.SetNextTest();
+        m_currentTest.ActivateScene(false);
     }
 
     private IEnumerator RoundEnding()
@@ -268,10 +328,6 @@ public class GameManager : NetworkBehaviour
         if (m_RoundWinner != null)
             m_RoundWinner.m_Wins++;
 
-        // Now the winner's score has been incremented, see if someone has one the game.
-        m_GameWinner = GetGameWinner();
-
-        //notify client they should disable tank control
         RpcRoundEnding();
 
         // Wait for the specified length of time until yielding control back to the game loop.
@@ -281,7 +337,7 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void RpcRoundEnding()
     {
-        
+        m_currentTestList.SetTestsForNextRound();
     }
 
     // This is used to check if there is one or fewer tanks remaining and thus the round should end.
@@ -380,8 +436,7 @@ public class GameManager : NetworkBehaviour
     {
         PlayerManager player = m_Players[playerID];
         Debug.Log("Answered");
-        List<int> answers = new List<int> { 1, 2, 3, 4 };
-        int score = m_currentTest.GetScore(answers);
+        int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers);
         player.m_Wins += score;
         m_answerSelected = true;
     }
@@ -399,7 +454,7 @@ public class GameManager : NetworkBehaviour
 
         while (elapsedTime < wait)
         {
-            if (m_RoundNumber == 1)
+            if (m_currentTestList.GetCurrentRound() == 1)
                 m_FadingScreen.alpha = 1.0f - (elapsedTime / wait);
             else
                 m_EndRoundScreen.alpha = 1.0f - (elapsedTime / wait);

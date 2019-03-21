@@ -9,6 +9,8 @@ public class HUD : MonoBehaviour
     public Text m_time;
     public Text m_name;
     public Text m_round;
+    public Text m_question;
+    public Text m_questionText;
 
     public void SetName(string name)
     {
@@ -18,11 +20,11 @@ public class HUD : MonoBehaviour
         }
     }
 
-    public void SetTime(string time)
+    public void SetTime(float time)
     {
         if (m_time)
         {
-            m_time.text = time;
+            m_time.text = string.Format("%2d:%2d", (int)(time / 60), (int)time % 60);
         }
     }
 
@@ -39,6 +41,22 @@ public class HUD : MonoBehaviour
         if (m_round)
         {
             m_round.text = "ROUND " + round.ToString();
+        }
+    }
+
+    public void SetQuestion(int question)
+    {
+        if (m_question)
+        {
+            m_question.text = "Question " + question;
+        }
+    }
+
+    public void SetQuestion(string name)
+    {
+        if (m_questionText)
+        {
+            m_questionText.text = name;
         }
     }
 }
