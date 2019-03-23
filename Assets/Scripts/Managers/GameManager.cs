@@ -7,6 +7,7 @@ using Prototype.NetworkLobby;
 
 public class GameManager : NetworkBehaviour
 {
+    static private int INVALID_PARTIAL_SELECTED = -1;
     static public GameManager s_Instance;
 
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
@@ -20,7 +21,8 @@ public class GameManager : NetworkBehaviour
     [SyncVar]
     public bool m_GameIsFinished = false;
 
-    public bool m_answerSelected = false;
+    private bool m_answerSelected = false;
+    private int m_partialAnsweredPlayerId = INVALID_PARTIAL_SELECTED;
 
     //Various UI references to hide the screen between rounds.
     [Space]
@@ -96,12 +98,15 @@ public class GameManager : NetworkBehaviour
         m_currentTestList.InitTests();
     }
 
+    //TODO make ClientRpc
     //[ClientRpc]
     public void RpcSetupGame()
     {
         SetupLocalPlayerID();
-        RpcSetupPlayerName();
+        RpcSetupPlayerNames();
         SetupModules();
+
+        //TODO only on server
         Hack_SetupTestList();
     }
 
@@ -115,11 +120,6 @@ public class GameManager : NetworkBehaviour
                 return;
             }
         }
-    }
-
-    private void RpcSetupPlayerName()
-    {
-        m_hud.SetName(m_Players[m_localPlayerID].GetName());
     }
 
     private void SetupModules()
@@ -268,31 +268,10 @@ public class GameManager : NetworkBehaviour
                 yield return null;
             }
             RpcTestAnswered();
-            RpcUpdateScore();
+            m_partialAnsweredPlayerId = INVALID_PARTIAL_SELECTED;
+            RpcSetPartialAnswer(m_partialAnsweredPlayerId);           
             yield return null;
         }
-    }
-
-    [ClientRpc]
-    void RpcUpdateTime(float time)
-    {
-        m_hud.SetTime(time);
-    }
-
-    [ClientRpc]
-    private void RpcUpdateScore()
-    {
-        m_hud.SetScore(m_Players[0].m_Wins, m_Players.Count == 2 ? m_Players[1].m_Wins : 0);
-    }
-
-    void UpdateQuestion(string question)
-    {
-        m_hud.SetQuestion(question);
-    }
-
-    void UpdateQuestion(int question)
-    {
-        m_hud.SetQuestion(question);
     }
 
     [ClientRpc]
@@ -428,22 +407,93 @@ public class GameManager : NetworkBehaviour
 
     public void CheckAnswers()
     {
-        RpcCheckAnswers(m_localPlayerID);
+        CmdCheckAnswers(m_localPlayerID);
     }
 
-    [ClientRpc]
-    public void RpcCheckAnswers(int playerID)
+    [Command]
+    public void CmdCheckAnswers(int playerID)
     {
+        if (playerID == m_partialAnsweredPlayerId)
+        {
+            return;
+        }
+
         PlayerManager player = m_Players[playerID];
         Debug.Log("Answered");
+
         int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers);
         player.m_Wins += score;
         m_answerSelected = true;
+        RpcUpdateScore(m_Players[0].m_Wins, m_Players.Count == 2 ? m_Players[1].m_Wins : 0);
+
+        if (m_Players.Count < 2)
+        {
+            //return;
+        }
+
+        //partialAnswer
+        if (score != m_currentTestList.GetCurrentTest().m_answers.Count)
+        {
+            if (m_partialAnsweredPlayerId == INVALID_PARTIAL_SELECTED)
+            {
+                m_answerSelected = false;
+            }
+            m_partialAnsweredPlayerId = playerID;
+            RpcSetPartialAnswer(playerID);
+        }
     }
 
     private void ResetAll()
     {
     }
+
+    //BEGIN HUD FUNCTIONS
+
+    [ClientRpc]
+    void RpcUpdateTime(float time)
+    {
+        m_hud.SetTime(time);
+    }
+
+    [ClientRpc]
+    private void RpcUpdateScore(int player1, int player2)
+    {
+        m_hud.SetScore(player1, player2);
+    }
+
+    [ClientRpc]
+    private void RpcSetPartialAnswer(int playerId)
+    {
+        m_hud.SetPartialAnswer(playerId);
+    }
+
+    void UpdateQuestion(string question)
+    {
+        m_hud.SetQuestion(question);
+    }
+
+    void UpdateQuestion(int question)
+    {
+        m_hud.SetQuestion(question);
+    }
+
+    private void RpcSetupPlayerNames()
+    {
+        m_hud.SetPlayerName(0, m_Players[0].GetName());
+        if (m_Players.Count > 1)
+        {
+            m_hud.SetPlayerName(1, m_Players[1].GetName());
+        }
+        else
+        {
+            m_hud.ShowPlayerName(1, false);
+        }
+    }
+
+    //END HUD FUNCTIONS
+
+
+    //BEGIN FADE FUNCS
 
     private IEnumerator ClientRoundStartingFade()
     {
@@ -482,4 +532,5 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    //END FADE FUNCS
 }
