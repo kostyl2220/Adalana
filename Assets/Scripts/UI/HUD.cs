@@ -20,6 +20,15 @@ public class HUD : MonoBehaviour
     public GameObject m_questionSection;
     public Text m_questionText;
     public PlayerData[] playerData = new PlayerData[2];
+    public FadeOutFadeIn m_screenMessage;
+
+    public void ShowScreenMessage(string message)
+    {
+        if (m_screenMessage)
+        {
+            m_screenMessage.SetText(message);
+        }
+    }
 
     public void ShowPlayerName(int playerId, bool show)
     {

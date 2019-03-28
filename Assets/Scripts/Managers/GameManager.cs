@@ -5,9 +5,16 @@ using UnityEngine.Networking;
 using System.Collections.Generic;
 using Prototype.NetworkLobby;
 
+
 public class GameManager : NetworkBehaviour
 {
+    static string PARTIAL_ANSWER_MESSAGE = "PARTIALLY ANSERED";
+    static string WIN_MESSAGE = "YOU WIN";
+    static string LOSE_MESSAGE = "YOU LOSE";
+    static string DRAW_MESSAGE = "DRAW";
+
     static private int INVALID_PARTIAL_SELECTED = -1;
+    static private int INVALID_PLAYER_ID = -1;
     static public GameManager s_Instance;
 
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
@@ -33,8 +40,8 @@ public class GameManager : NetworkBehaviour
 
     private WaitForSeconds m_StartWait;         // Used to have a delay whilst the round starts.
     private WaitForSeconds m_EndWait;           // Used to have a delay whilst the round or game ends.
-    private PlayerManager m_RoundWinner;          // Reference to the winner of the current round.  Used to make an announcement of who won.
-    private PlayerManager m_GameWinner;           // Reference to the winner of the game.  Used to make an announcement of who won.
+    private int m_RoundWinnerId;          // Reference to the winner of the current round.  Used to make an announcement of who won.
+    private int m_GameWinnerId;           // Reference to the winner of the game.  Used to make an announcement of who won.
     private int m_localPlayerID;
     private List<TestModule> m_testModules;
     private TestModule m_currentTest;
@@ -196,8 +203,12 @@ public class GameManager : NetworkBehaviour
             // Once execution has returned here, run the 'RoundEnding' coroutine.
             yield return StartCoroutine(RoundEnding());
         }
+
+        m_GameWinnerId = GetGameWinnerId();
+        RpcAnnounceWinner(m_GameWinnerId);
+
         // This code is not run until 'RoundEnding' has finished.  At which point, check if there is a winner of the game.
-        if (m_GameWinner != null)
+        if (m_GameWinnerId != INVALID_PLAYER_ID)
         {// If there is a game winner, wait for certain amount or all player confirmed to start a game again
             m_GameIsFinished = true;
             float leftWaitTime = 15.0f;
@@ -297,15 +308,12 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator RoundEnding()
     {
-        // Clear the winner from the previous round.
-        m_RoundWinner = null;
-
         // See if there is a winner now the round is over.
-        m_RoundWinner = GetRoundWinner();
+        m_RoundWinnerId = GetRoundWinnerId();
 
         // If there is a winner, increment their score.
-        if (m_RoundWinner != null)
-            m_RoundWinner.m_Wins++;
+        if (m_RoundWinnerId != INVALID_PLAYER_ID)
+            m_Players[m_RoundWinnerId].m_Wins++;
 
         RpcRoundEnding();
 
@@ -332,46 +340,64 @@ public class GameManager : NetworkBehaviour
 
     // This function is to find out if there is a winner of the round.
     // This function is called with the assumption that 1 or fewer tanks are currently active.
-    private PlayerManager GetRoundWinner()
+    private int GetRoundWinnerId()
     {
-        // Go through all the tanks...
-        for (int i = 0; i < m_Players.Count; i++)
-        {
-            return m_Players[i];
-        }
-
-        // If none of the tanks are active it is a draw so return null.
-        return null;
-    }
-
-
-    // This function is to find out if there is a winner of the game.
-    private PlayerManager GetGameWinner()
-    {
-        int maxScore = 0;
+        int maxScoredPlayer = 0;
+        bool uniqueScore = true;
 
         // Go through all the tanks...
-        for (int i = 0; i < m_Players.Count; i++)
+        for (int i = 1; i < m_Players.Count; i++)
         {
-            if (m_Players[i].m_Wins > maxScore)
+            if (m_Players[i].m_RightAnswers > m_Players[maxScoredPlayer].m_RightAnswers)
             {
-                maxScore = m_Players[i].m_Wins;
+                uniqueScore = true;
+                maxScoredPlayer = i;
             }
-
-            // ... and if one of them has enough rounds to win the game, return it.
-            if (m_Players[i].m_Wins == m_NumRoundsToWin)
-                return m_Players[i];
-        }
-
-        //go throught a second time to enable/disable the crown on tanks
-        //(note : we don't enter it if the maxScore is 0, as no one is current leader yet!)
-        for (int i = 0; i < m_Players.Count && maxScore > 0; i++)
-        {
-            m_Players[i].SetLeader(maxScore == m_Players[i].m_Wins);
+            else if (m_Players[i].m_RightAnswers == m_Players[maxScoredPlayer].m_RightAnswers)
+            {
+                uniqueScore = false;
+            }
         }
 
         // If no tanks have enough rounds to win, return null.
-        return null;
+        return uniqueScore ? maxScoredPlayer : INVALID_PLAYER_ID;
+    }
+
+    [ClientRpc]
+    private void RpcAnnounceWinner(int winnerId)
+    {
+        if (winnerId == INVALID_PLAYER_ID)
+        {
+            ShowScreenMessage(DRAW_MESSAGE);
+        }
+        else
+        {
+            ShowScreenMessage(winnerId == m_localPlayerID ? WIN_MESSAGE : LOSE_MESSAGE);
+        }
+    }
+
+    // This function is to find out if there is a winner of the game.
+    private int GetGameWinnerId()
+    {
+        int maxScoredPlayer = 0;
+        bool uniqueScore = true;
+
+        // Go through all the tanks...
+        for (int i = 1; i < m_Players.Count; i++)
+        {
+            if (m_Players[i].m_Wins > m_Players[maxScoredPlayer].m_Wins)
+            {
+                uniqueScore = true;
+                maxScoredPlayer = i;
+            }
+            else if (m_Players[i].m_Wins == m_Players[maxScoredPlayer].m_Wins)
+            {
+                uniqueScore = false;
+            }
+        }
+
+        // If no tanks have enough rounds to win, return null.
+        return uniqueScore ? maxScoredPlayer : INVALID_PLAYER_ID;
     }
 
 
@@ -383,11 +409,17 @@ public class GameManager : NetworkBehaviour
 
 
         // If there is a game winner set the message to say which player has won the game.
-        if (m_GameWinner != null)
-            message = "<color=#" + ColorUtility.ToHtmlStringRGB(m_GameWinner.m_PlayerColor) + ">" + m_GameWinner.m_PlayerName + "</color> WINS THE GAME!";
+        if (m_GameWinnerId != INVALID_PLAYER_ID)
+        {
+            PlayerManager gameWinner = m_Players[m_GameWinnerId];
+            message = "<color=#" + ColorUtility.ToHtmlStringRGB(gameWinner.m_PlayerColor) + ">" + gameWinner.m_PlayerName + "</color> WINS THE GAME!";
+        }
         // If there is a winner, change the message to display 'PLAYER #' in their color and a winning message.
-        else if (m_RoundWinner != null)
-            message = "<color=#" + ColorUtility.ToHtmlStringRGB(m_RoundWinner.m_PlayerColor) + ">" + m_RoundWinner.m_PlayerName + "</color> WINS THE ROUND!";
+        else if (m_RoundWinnerId != INVALID_PLAYER_ID)
+        {
+            PlayerManager roundWinner = m_Players[m_GameWinnerId];
+            message = "<color=#" + ColorUtility.ToHtmlStringRGB(roundWinner.m_PlayerColor) + ">" + roundWinner.m_PlayerName + "</color> WINS THE ROUND!";
+        }
 
         // After either the message of a draw or a winner, add some space before the leader board.
         message += "\n\n";
@@ -399,7 +431,7 @@ public class GameManager : NetworkBehaviour
                 + (m_Players[i].IsReady() ? "<size=15>READY</size>" : "") + " \n";
         }
 
-        if (m_GameWinner != null)
+        if (m_GameWinnerId != INVALID_PLAYER_ID)
             message += "\n\n<size=20 > Return to lobby in " + waitTime + "\nPress Fire to get ready</size>";
 
         return message;
@@ -422,9 +454,9 @@ public class GameManager : NetworkBehaviour
         Debug.Log("Answered");
 
         int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers);
-        player.m_Wins += score;
+        player.m_RightAnswers += score;
         m_answerSelected = true;
-        RpcUpdateScore(m_Players[0].m_Wins, m_Players.Count == 2 ? m_Players[1].m_Wins : 0);
+        RpcUpdateScore(m_Players[0].m_RightAnswers, m_Players.Count == 2 ? m_Players[1].m_RightAnswers : 0);
 
         if (m_Players.Count < 2)
         {
@@ -440,7 +472,26 @@ public class GameManager : NetworkBehaviour
             }
             m_partialAnsweredPlayerId = playerID;
             RpcSetPartialAnswer(playerID);
+            SetPlayerMessage(playerID, PARTIAL_ANSWER_MESSAGE);
         }
+    }
+
+    public void SetPlayerMessage(int playerID, string message)
+    {
+        if (m_localPlayerID == playerID)
+        {
+            ShowScreenMessage(message);
+        }
+        else
+        {
+            ClientShowScreenMessage(message);
+        }
+    }
+
+    [Client]
+    void ClientShowScreenMessage(string message)
+    {
+        ShowScreenMessage(PARTIAL_ANSWER_MESSAGE);
     }
 
     private void ResetAll()
@@ -448,6 +499,11 @@ public class GameManager : NetworkBehaviour
     }
 
     //BEGIN HUD FUNCTIONS
+
+    void ShowScreenMessage(string message)
+    {
+        m_hud.ShowScreenMessage(message);
+    }
 
     [ClientRpc]
     void RpcUpdateTime(float time)

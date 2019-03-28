@@ -15,6 +15,8 @@ public class PlayerManager
     [HideInInspector]
     public GameObject m_Instance;             // A reference to the instance of the tank when it is created.
     [HideInInspector]
+    public int m_RightAnswers;                        // The number of wins this player has so far.
+    [HideInInspector]
     public int m_Wins;                        // The number of wins this player has so far.
     [HideInInspector]
     public string m_PlayerName;                    // The player name set in the lobby
