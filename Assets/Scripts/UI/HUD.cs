@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
+//class fasade
 public class HUD : MonoBehaviour
 {
     [Serializable]
@@ -11,6 +12,7 @@ public class HUD : MonoBehaviour
     {
         public Text Name;
         public GameObject PartialAnswer;
+        public StarHolder StarHolder;
     }
 
     public Text m_score;
@@ -22,6 +24,8 @@ public class HUD : MonoBehaviour
     public PlayerData[] playerData = new PlayerData[2];
     public FadeOutFadeIn m_screenMessage;
 
+    private int m_totalRounds;
+
     public void ShowScreenMessage(string message)
     {
         if (m_screenMessage)
@@ -30,7 +34,7 @@ public class HUD : MonoBehaviour
         }
     }
 
-    public void ShowPlayerName(int playerId, bool show)
+    public void ShowPlayerInfo(int playerId, bool show)
     {
         if (playerData[playerId].Name)
         {
@@ -58,7 +62,7 @@ public class HUD : MonoBehaviour
     {
         if (m_score)
         {
-            m_score.text = player1.ToString() + ":" + player2.ToString();
+            m_score.text = player2.ToString() + ":" + player1.ToString();
         }
     }
 
@@ -66,8 +70,13 @@ public class HUD : MonoBehaviour
     {
         if (m_round)
         {
-            m_round.text = "ROUND " + round.ToString();
+            m_round.text = "ROUND " + round.ToString() + "/" + m_totalRounds;
         }
+    }
+
+    public void SetTotalRounds(int rounds)
+    {
+        m_totalRounds = rounds;
     }
 
     public void HideQuestion()
@@ -98,18 +107,30 @@ public class HUD : MonoBehaviour
 
     public void SetPartialAnswer(int playerId)
     {
-        if (playerId < 0 || playerId > 1)
+        if (playerId == GameManager.INVALID_PLAYER_ID)
         {
             foreach (var data in playerData)
             {
                 data.PartialAnswer.SetActive(false);
             }
+           
+        }
+        else if (playerData[playerId].PartialAnswer)
+        {
+            playerData[playerId].PartialAnswer.SetActive(true);
+        }
+    }
+
+    public void AddStar(int playerId)
+    {
+        if (playerId == GameManager.INVALID_PLAYER_ID)
+        {
             return;
         }
 
-        if (playerData[playerId].PartialAnswer)
+        if (playerData[playerId].StarHolder)
         {
-            playerData[playerId].PartialAnswer.SetActive(true);
+            playerData[playerId].StarHolder.AddStar();
         }
     }
 }

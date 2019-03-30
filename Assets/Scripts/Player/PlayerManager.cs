@@ -23,6 +23,9 @@ public class PlayerManager
     [HideInInspector]
     public int m_LocalPlayerID;                    // The player localID (if there is more than 1 player on the same machine)
 
+    [HideInInspector]
+    public bool m_loadReady = false;
+
     public PlayerSetup m_Setup;
 
     public void Setup()

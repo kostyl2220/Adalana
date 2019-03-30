@@ -13,8 +13,8 @@ public class GameManager : NetworkBehaviour
     static string LOSE_MESSAGE = "YOU LOSE";
     static string DRAW_MESSAGE = "DRAW";
 
+    static public int INVALID_PLAYER_ID = -1;
     static private int INVALID_PARTIAL_SELECTED = -1;
-    static private int INVALID_PLAYER_ID = -1;
     static public GameManager s_Instance;
 
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
@@ -105,16 +105,17 @@ public class GameManager : NetworkBehaviour
         m_currentTestList.InitTests();
     }
 
-    //TODO make ClientRpc
-    //[ClientRpc]
+    [ClientRpc]
     public void RpcSetupGame()
     {
         SetupLocalPlayerID();
-        RpcSetupPlayerNames();
+        SetupPlayerNames();
         SetupModules();
-
+        Debug.Log("Hello");
         //TODO only on server
         Hack_SetupTestList();
+        m_hud.SetTotalRounds(m_currentTestList.m_countOfRounds);
+        CmdPlayerReady(m_localPlayerID);
     }
 
     private void SetupLocalPlayerID()
@@ -194,6 +195,9 @@ public class GameManager : NetworkBehaviour
 
         RpcSetupGame();
 
+        while (!AllPlayersReady())
+            yield return null;
+
         while (m_currentTestList.IsRoundAvaliable())
         {
             // Start off by running the 'RoundStarting' coroutine but don't return until it's finished.
@@ -205,7 +209,7 @@ public class GameManager : NetworkBehaviour
         }
 
         m_GameWinnerId = GetGameWinnerId();
-        RpcAnnounceWinner(m_GameWinnerId);
+        RpcEndGame(m_GameWinnerId);
 
         // This code is not run until 'RoundEnding' has finished.  At which point, check if there is a winner of the game.
         if (m_GameWinnerId != INVALID_PLAYER_ID)
@@ -244,8 +248,27 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    private bool AllPlayersReady()
+    {
+        foreach(var player in m_Players)
+        {
+            if (!player.m_loadReady)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    [Command]
+    public void CmdPlayerReady(int playerID)
+    {
+        m_Players[playerID].m_loadReady = true;
+    }
+
     private IEnumerator RoundStarting()
     {
+        ResetAll();
         //we notify all clients that the round is starting
         RpcRoundStarting();
 
@@ -256,8 +279,6 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     void RpcRoundStarting()
     {
-        // As soon as the round starts reset the tanks and make sure they can't move.
-        ResetAll();
         // Increment the round number and display text showing the players what round it is.
         m_hud.SetRound(m_currentTestList.GetCurrentRound());
     }
@@ -310,20 +331,25 @@ public class GameManager : NetworkBehaviour
     {
         // See if there is a winner now the round is over.
         m_RoundWinnerId = GetRoundWinnerId();
-
         // If there is a winner, increment their score.
         if (m_RoundWinnerId != INVALID_PLAYER_ID)
+        {
             m_Players[m_RoundWinnerId].m_Wins++;
+        }
 
-        RpcRoundEnding();
+        RpcRoundEnding(m_RoundWinnerId);
 
         // Wait for the specified length of time until yielding control back to the game loop.
         yield return m_EndWait;
     }
 
     [ClientRpc]
-    private void RpcRoundEnding()
+    private void RpcRoundEnding(int roundWinnerId)
     {
+        if (m_Players.Count > 1)
+        {
+            m_hud.AddStar(roundWinnerId);
+        }
         m_currentTestList.SetTestsForNextRound();
     }
 
@@ -364,8 +390,10 @@ public class GameManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void RpcAnnounceWinner(int winnerId)
+    private void RpcEndGame(int winnerId)
     {
+        m_hud.HideQuestion();
+
         if (winnerId == INVALID_PLAYER_ID)
         {
             ShowScreenMessage(DRAW_MESSAGE);
@@ -456,11 +484,11 @@ public class GameManager : NetworkBehaviour
         int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers);
         player.m_RightAnswers += score;
         m_answerSelected = true;
-        RpcUpdateScore(m_Players[0].m_RightAnswers, m_Players.Count == 2 ? m_Players[1].m_RightAnswers : 0);
+        ServerUpdateScore();
 
         if (m_Players.Count < 2)
         {
-            //return;
+            return;
         }
 
         //partialAnswer
@@ -472,11 +500,17 @@ public class GameManager : NetworkBehaviour
             }
             m_partialAnsweredPlayerId = playerID;
             RpcSetPartialAnswer(playerID);
-            SetPlayerMessage(playerID, PARTIAL_ANSWER_MESSAGE);
+            SetPlayerMessageLocal(playerID, PARTIAL_ANSWER_MESSAGE);
         }
     }
 
-    public void SetPlayerMessage(int playerID, string message)
+    private void ServerUpdateScore()
+    {
+        RpcUpdateScore(m_Players[0].m_RightAnswers, m_Players.Count == 2 ? m_Players[1].m_RightAnswers : 0);
+    }
+
+    //on server
+    public void SetPlayerMessageLocal(int playerID, string message)
     {
         if (m_localPlayerID == playerID)
         {
@@ -496,6 +530,11 @@ public class GameManager : NetworkBehaviour
 
     private void ResetAll()
     {
+        foreach(var player in m_Players)
+        {
+            player.m_RightAnswers = 0;
+        }
+        ServerUpdateScore();
     }
 
     //BEGIN HUD FUNCTIONS
@@ -533,7 +572,7 @@ public class GameManager : NetworkBehaviour
         m_hud.SetQuestion(question);
     }
 
-    private void RpcSetupPlayerNames()
+    private void SetupPlayerNames()
     {
         m_hud.SetPlayerName(0, m_Players[0].GetName());
         if (m_Players.Count > 1)
@@ -542,7 +581,7 @@ public class GameManager : NetworkBehaviour
         }
         else
         {
-            m_hud.ShowPlayerName(1, false);
+            m_hud.ShowPlayerInfo(1, false);
         }
     }
 

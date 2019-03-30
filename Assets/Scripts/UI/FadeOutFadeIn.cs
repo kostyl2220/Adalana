@@ -5,8 +5,9 @@ using UnityEngine.UI;
 
 public class FadeOutFadeIn : MonoBehaviour
 {
-    public float m_fadeOutTime = 2.0f;
-    public float m_fadeInTime = 2.0f;
+    public float m_fadeOutTime = 0.7f;
+    public float m_waitTime = 2.0f;
+    public float m_fadeInTime = 1.0f;
     public Text m_text;
 
     // Start is called before the first frame update
@@ -22,9 +23,15 @@ public class FadeOutFadeIn : MonoBehaviour
     }
 
     private void StartFade()
+    {      
+        StartCoroutine(RunFades());
+    }
+
+    IEnumerator RunFades()
     {
-        StartCoroutine(FadeOut());
-        StartCoroutine(FadeIn());
+        yield return FadeOut();
+        yield return new WaitForSeconds(m_waitTime);
+        yield return FadeIn();
     }
 
     IEnumerator FadeOut()
@@ -34,7 +41,7 @@ public class FadeOutFadeIn : MonoBehaviour
         {
             yield return null;
             curTime += Time.deltaTime;
-            transform.localScale = Vector3.one * curTime / m_fadeOutTime;
+            transform.localScale = Vector3.one * (curTime / m_fadeOutTime);
         }
     }
 
@@ -45,7 +52,7 @@ public class FadeOutFadeIn : MonoBehaviour
         {
             yield return null;
             curTime -= Time.deltaTime;
-            transform.localScale = Vector3.one * curTime / m_fadeInTime;
+            transform.localScale = Vector3.one * (curTime / m_fadeInTime);
         }
     }
 }
