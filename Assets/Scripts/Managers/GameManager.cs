@@ -23,6 +23,8 @@ public class GameManager : NetworkBehaviour
     public int m_NumRoundsToWin = 5;          // The number of rounds a single player has to win to win the game.
     public float m_StartDelay = 3f;           // The delay between the start of RoundStarting and RoundPlaying phases.
     public float m_EndDelay = 3f;             // The delay between the end of RoundPlaying and RoundEnding phases.
+    public float m_LoadingWaitDelay = 0.1f;           // The delay between the start of RoundStarting and RoundPlaying phases.
+    public float m_ReadyWaitDelay = 0.1f;
 
     [HideInInspector]
     [SyncVar]
@@ -39,13 +41,16 @@ public class GameManager : NetworkBehaviour
     public HUD m_hud;
 
     private WaitForSeconds m_StartWait;         // Used to have a delay whilst the round starts.
+    private WaitForSeconds m_LoadingWait;
+    private WaitForSeconds m_ReadyWait;
     private WaitForSeconds m_EndWait;           // Used to have a delay whilst the round or game ends.
     private int m_RoundWinnerId;          // Reference to the winner of the current round.  Used to make an announcement of who won.
     private int m_GameWinnerId;           // Reference to the winner of the game.  Used to make an announcement of who won.
-    private int m_localPlayerID;
+    private int m_localPlayerID = INVALID_PLAYER_ID;
     private List<TestModule> m_testModules;
     private TestModule m_currentTest;
     private TestsList m_currentTestList;
+    private int m_addedPlayers = 0;
 
     void Awake()
     {
@@ -108,7 +113,6 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     public void RpcSetupGame()
     {
-        SetupLocalPlayerID();
         SetupPlayerNames();
         SetupModules();
         Debug.Log("Hello");
@@ -120,6 +124,11 @@ public class GameManager : NetworkBehaviour
 
     private void SetupLocalPlayerID()
     {
+        if (m_localPlayerID != INVALID_PLAYER_ID)
+        {
+            return;
+        }
+
         for (int i = 0; i < m_Players.Count; ++i)
         {
             if (m_Players[i].m_Setup.isLocalPlayer)
@@ -146,6 +155,8 @@ public class GameManager : NetworkBehaviour
         // Create the delays so they only have to be made once.
         m_StartWait = new WaitForSeconds(m_StartDelay);
         m_EndWait = new WaitForSeconds(m_EndDelay);
+        m_LoadingWait = new WaitForSeconds(m_LoadingWaitDelay);
+        m_ReadyWait = new WaitForSeconds(m_ReadyWaitDelay);
 
         // Once the tanks have been created and the camera is using them as targets, start the game.
         StartCoroutine(GameLoop());
@@ -187,16 +198,41 @@ public class GameManager : NetworkBehaviour
             m_Players.Remove(toRemove);
     }
 
+    [ClientRpc]
+    public void RpcCheckReady()
+    {
+        SetupLocalPlayerID();
+        m_hud.SetPlayerName(0, m_localPlayerID.ToString());
+        m_hud.SetTime(Time.time);
+        CmdClientReady(m_localPlayerID);
+    }
+
+    [Command]
+    public void CmdClientReady(int clientId)
+    {
+        Debug.Log(clientId);
+        m_hud.SetPlayerName(1, clientId.ToString());
+        m_Players[clientId].m_loaded = true;
+    }
+
     // This is called from start and will run each phase of the game one after another. ONLY ON SERVER (as Start is only called on server)
     private IEnumerator GameLoop()
     {
-        while (m_Players.Count < 1)
+        while (m_Players.Count < 1)//LobbyManager.s_Singleton.numPlayers)
             yield return null;
+
+        while (!AllPlayersLoaded())
+        {
+            RpcCheckReady();
+            yield return m_LoadingWait;
+        }
+
+        Debug.Log("All loaded");
 
         RpcSetupGame();
-
+        
         while (!AllPlayersReady())
-            yield return null;
+            yield return m_ReadyWait;
 
         while (m_currentTestList.IsRoundAvaliable())
         {
@@ -253,6 +289,18 @@ public class GameManager : NetworkBehaviour
         foreach(var player in m_Players)
         {
             if (!player.m_loadReady)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool AllPlayersLoaded()
+    {
+        foreach (var player in m_Players)
+        {
+            if (!player.m_loaded)
             {
                 return false;
             }
