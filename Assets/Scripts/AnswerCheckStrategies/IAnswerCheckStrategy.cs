@@ -4,5 +4,5 @@ using UnityEngine;
 
 public abstract class IAnswerCheckStrategy 
 {
-    public abstract int GetScore(List<int> answers);
+    public abstract int GetScore(int[] rightAnswers, int[] currentAnswers);
 }

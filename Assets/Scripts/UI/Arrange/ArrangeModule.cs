@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,6 +14,16 @@ public class ArrangeModule : MonoBehaviour
     {
         m_cells = new List<ArrangeCell>();
         //SetupSlots(m_countOfCells);
+    }
+
+    public int[] GetCurrentAnswers()
+    {
+        List<int> answers = new List<int>();
+        foreach(var cell in m_cells)
+        {
+            answers.Add((cell && cell.GetCurrentItem()) ? cell.GetCurrentItem().ID : -1);
+        }
+        return answers.ToArray();
     }
 
     public void SetupSlots(int count)

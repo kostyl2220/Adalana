@@ -12,6 +12,6 @@ public class TankLobbyHook : Prototype.NetworkLobby.LobbyHook
 		Prototype.NetworkLobby.LobbyPlayer lp = lobbyPlayer.GetComponent<Prototype.NetworkLobby.LobbyPlayer>();
 
         if(lp != null)
-            GameManager.AddTank(gamePlayer, lp.slot, lp.playerColor, lp.nameInput.text, lp.playerControllerId);
+            GameManager.AddPlayer(gamePlayer, lp.slot, lp.playerColor, lp.nameInput.text, lp.playerControllerId);
     }
 }

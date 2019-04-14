@@ -12,8 +12,8 @@ public class Test
     public TestTypes m_type; 
     public string m_question;
     public float m_answerTime;
-    public List<Variant> m_variants;
-    public List<int> m_answers;
+    public Variant[] m_variants;
+    public int[] m_answers;
 }
 
 public class TestsList

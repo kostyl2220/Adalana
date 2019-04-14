@@ -26,14 +26,14 @@ public class AnswerInitializer : MonoBehaviour
 
     private List<Variant> m_vars;
 
-    public void SetupVariants(List<Variant> vars)
+    public void SetupVariants(Variant[] vars)
     {
         if (!m_instance)
         {
             return;
         }
 
-        int count = vars.Count;
+        int count = vars.Length;
         while (m_variants.Count < count)
         {
             Transform newPlace = Instantiate(m_gridInstance, m_gridParent);
@@ -66,7 +66,7 @@ public class AnswerInitializer : MonoBehaviour
         }
     }
 
-    private List<E> ShuffleList<E>(List<E> inputList)
+    private List<E> ShuffleList<E>(E[] inputList)
     {
         List<E> randomList = new List<E>();
         List<E> copyList = new List<E>();

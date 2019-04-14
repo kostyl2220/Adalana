@@ -25,8 +25,6 @@ public class PlayerManager
 
     [HideInInspector]
     public bool m_loadReady = false;
-    [HideInInspector]
-    public bool m_loaded = false;
 
     public PlayerSetup m_Setup;
 

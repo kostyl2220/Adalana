@@ -4,20 +4,12 @@ using UnityEngine;
 
 public class DefaultArrangedAnswerCheckStrategy : IAnswerCheckStrategy
 {
-    private ArrangeModule m_module;
-
-    public DefaultArrangedAnswerCheckStrategy(ArrangeModule module)
-    {
-        m_module = module;
-    }
-
-    public override int GetScore(List<int> answers)
+    public override int GetScore(int[] rightAnswers, int[] currentAnswers)
     {
         int res = 0;
-        for (int i = 0; i < answers.Count; ++i)
+        for (int i = 0; i < rightAnswers.Length; ++i)
         {
-            ArrangeCell cell = m_module.GetCells()[i];
-            if (cell.GetCurrentItem() && cell.GetCurrentItem().ID == answers[i])
+            if (rightAnswers[i] == currentAnswers[i])
             {
                 ++res;
             }

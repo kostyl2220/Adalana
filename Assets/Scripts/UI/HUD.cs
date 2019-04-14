@@ -62,7 +62,7 @@ public class HUD : MonoBehaviour
     {
         if (m_score)
         {
-            m_score.text = player2.ToString() + ":" + player1.ToString();
+            m_score.text = (player2 == GameManager.INVALID_SCORE) ? player1.ToString() : player2.ToString() + ":" + player1.ToString();
         }
     }
 

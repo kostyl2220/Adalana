@@ -2,14 +2,16 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class TestModule : MonoBehaviour
+public abstract class TestModuleBlock : MonoBehaviour
 {
     public GameObject m_testScene;
     protected IAnswerCheckStrategy m_checkStrategy;
 
-    public int GetScore(List<int> answers)
+    public abstract int[] GetCurrentAnswers();
+
+    public int GetScore(int[] rightAnswers, int[] currentAnswers)
     {
-        return m_checkStrategy.GetScore(answers);
+        return m_checkStrategy.GetScore(rightAnswers, currentAnswers);
     }
 
     public void ActivateScene(bool activate)

@@ -15,6 +15,7 @@ public class GameManager : NetworkBehaviour
 
     static public int INVALID_PLAYER_ID = -1;
     static private int INVALID_PARTIAL_SELECTED = -1;
+    static public int INVALID_SCORE = -1;
     static public GameManager s_Instance;
 
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
@@ -47,8 +48,8 @@ public class GameManager : NetworkBehaviour
     private int m_RoundWinnerId;          // Reference to the winner of the current round.  Used to make an announcement of who won.
     private int m_GameWinnerId;           // Reference to the winner of the game.  Used to make an announcement of who won.
     private int m_localPlayerID = INVALID_PLAYER_ID;
-    private List<TestModule> m_testModules;
-    private TestModule m_currentTest;
+    private List<TestModuleBlock> m_testModules;
+    private TestModuleBlock m_currentTest;
     private TestsList m_currentTestList;
     private int m_addedPlayers = 0;
 
@@ -61,15 +62,15 @@ public class GameManager : NetworkBehaviour
     {
         m_currentTestList = new TestsList();
 
-        List<Variant> vars1 = new List<Variant>
-            {
+        Variant[] vars1 = 
+        {
              new Variant("Hello", 1)
             , new Variant("World", 2)
             , new Variant("How are", 3)
             , new Variant("you?", 4)
         };
 
-        List<int> answers1 = new List<int>{ 1, 2, 3, 4 };
+        int[] answers1 = { 1, 2, 3, 4 };
 
         Test test1 = new Test
         {
@@ -80,15 +81,15 @@ public class GameManager : NetworkBehaviour
             m_answers = answers1
         };
 
-        List<Variant> vars2 = new List<Variant>
-            {
+        Variant[] vars2 = 
+        {
              new Variant("Lol", 1)
             , new Variant("Kek", 2)
             , new Variant("Chebu", 3)
             , new Variant("Rek", 4)
         };
 
-        List<int> answers2 = new List<int> { 1, 2, 3, 4 };
+        int[] answers2 = { 1, 2, 3, 4 };
 
         Test test2 = new Test
         {
@@ -111,24 +112,15 @@ public class GameManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    public void RpcSetupGame()
+    public void RpcSetupGame(int totalRounds)
     {
         SetupPlayerNames();
         SetupModules();
-        Debug.Log("Hello");
-        //TODO only on server
-        Hack_SetupTestList();
-        m_hud.SetTotalRounds(m_currentTestList.m_countOfRounds);
-        CmdPlayerReady(m_localPlayerID);
+        m_hud.SetTotalRounds(totalRounds);
     }
 
     private void SetupLocalPlayerID()
     {
-        if (m_localPlayerID != INVALID_PLAYER_ID)
-        {
-            return;
-        }
-
         for (int i = 0; i < m_Players.Count; ++i)
         {
             if (m_Players[i].m_Setup.isLocalPlayer)
@@ -141,10 +133,10 @@ public class GameManager : NetworkBehaviour
 
     private void SetupModules()
     {
-        m_testModules = new List<TestModule>();
+        m_testModules = new List<TestModuleBlock>();
         foreach (Transform module in transform)
         {
-            ArrangeTestModule atm = module.GetComponent<ArrangeTestModule>();
+            ArrangeTestModuleBlock atm = module.GetComponent<ArrangeTestModuleBlock>();
             m_testModules.Add(atm);
         }
     }
@@ -158,6 +150,10 @@ public class GameManager : NetworkBehaviour
         m_LoadingWait = new WaitForSeconds(m_LoadingWaitDelay);
         m_ReadyWait = new WaitForSeconds(m_ReadyWaitDelay);
 
+        //TODO use Command function
+        NetworkServer.RegisterHandler((short)MessageType.ClientReady, OnClientReady);
+        NetworkServer.RegisterHandler((short)MessageType.ClientAnswer, OnClientAnswered);
+
         // Once the tanks have been created and the camera is using them as targets, start the game.
         StartCoroutine(GameLoop());
     }
@@ -170,7 +166,7 @@ public class GameManager : NetworkBehaviour
     /// <param name="c">The color of the player, choosen in the lobby</param>
     /// <param name="name">The name of the Player, choosen in the lobby</param>
     /// <param name="localID">The localID. e.g. if 2 player are on the same machine this will be 1 & 2</param>
-    static public void AddTank(GameObject tank, int playerNum, Color c, string name, int localID)
+    static public void AddPlayer(GameObject tank, int playerNum, Color c, string name, int localID)
     {
         PlayerManager tmp = new PlayerManager();
         tmp.m_Instance = tank;
@@ -201,18 +197,21 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     public void RpcCheckReady()
     {
-        SetupLocalPlayerID();
-        m_hud.SetPlayerName(0, m_localPlayerID.ToString());
-        m_hud.SetTime(Time.time);
-        CmdClientReady(m_localPlayerID);
-    }
+        if (m_localPlayerID != INVALID_PLAYER_ID)
+        {
+            return;
+        }
 
-    [Command]
-    public void CmdClientReady(int clientId)
-    {
-        Debug.Log(clientId);
-        m_hud.SetPlayerName(1, clientId.ToString());
-        m_Players[clientId].m_loaded = true;
+        SetupLocalPlayerID();
+
+        if (!isServer)
+        {
+            NetworkManager.singleton.client.Send((short)MessageType.ClientReady, new ClientReadyMessage(m_localPlayerID));
+        }
+        else
+        {
+            m_Players[m_localPlayerID].m_loadReady = true;
+        }
     }
 
     // This is called from start and will run each phase of the game one after another. ONLY ON SERVER (as Start is only called on server)
@@ -221,18 +220,14 @@ public class GameManager : NetworkBehaviour
         while (m_Players.Count < 1)//LobbyManager.s_Singleton.numPlayers)
             yield return null;
 
-        while (!AllPlayersLoaded())
+        while (!AllPlayersReady())
         {
             RpcCheckReady();
             yield return m_LoadingWait;
         }
 
-        Debug.Log("All loaded");
-
-        RpcSetupGame();
-        
-        while (!AllPlayersReady())
-            yield return m_ReadyWait;
+        Hack_SetupTestList();
+        RpcSetupGame(m_currentTestList.m_countOfRounds);
 
         while (m_currentTestList.IsRoundAvaliable())
         {
@@ -242,6 +237,8 @@ public class GameManager : NetworkBehaviour
             yield return StartCoroutine(RoundPlaying());
             // Once execution has returned here, run the 'RoundEnding' coroutine.
             yield return StartCoroutine(RoundEnding());
+
+            m_currentTestList.SetTestsForNextRound();
         }
 
         m_GameWinnerId = GetGameWinnerId();
@@ -272,7 +269,6 @@ public class GameManager : NetworkBehaviour
                 if (newFlooredWaitTime != flooredWaitTime)
                 {
                     flooredWaitTime = newFlooredWaitTime;
-                    string message = EndMessage(flooredWaitTime);
                 }
             }
 
@@ -296,49 +292,32 @@ public class GameManager : NetworkBehaviour
         return true;
     }
 
-    private bool AllPlayersLoaded()
-    {
-        foreach (var player in m_Players)
-        {
-            if (!player.m_loaded)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    [Command]
-    public void CmdPlayerReady(int playerID)
-    {
-        m_Players[playerID].m_loadReady = true;
-    }
-
     private IEnumerator RoundStarting()
     {
         ResetAll();
         //we notify all clients that the round is starting
-        RpcRoundStarting();
+        RpcRoundStarting(m_currentTestList.GetCurrentRound());
 
         // Wait for the specified length of time until yielding control back to the game loop.
         yield return m_StartWait;
     }
 
     [ClientRpc]
-    void RpcRoundStarting()
+    void RpcRoundStarting(int roundNumber)
     {
         // Increment the round number and display text showing the players what round it is.
-        m_hud.SetRound(m_currentTestList.GetCurrentRound());
+        m_hud.SetRound(roundNumber);
     }
 
     private IEnumerator RoundPlaying()
     {     
         while (m_currentTestList.HasValidQuestionForRound())
         {
-            RpcTestPlaying();
+            Test currentTest = m_currentTestList.GetCurrentTest();
+            RpcTestPlaying(currentTest, m_currentTestList.GetCurrentQuestionNumber());
 
             m_answerSelected = false;
-            float remainingTime = m_currentTestList.GetCurrentTest().m_answerTime;
+            float remainingTime = currentTest.m_answerTime;
             // While there is not one tank left...
             while (remainingTime > 0 && !m_answerSelected)
             {
@@ -348,6 +327,7 @@ public class GameManager : NetworkBehaviour
                 yield return null;
             }
             RpcTestAnswered();
+            m_currentTestList.SetNextTest();
             m_partialAnsweredPlayerId = INVALID_PARTIAL_SELECTED;
             RpcSetPartialAnswer(m_partialAnsweredPlayerId);           
             yield return null;
@@ -355,23 +335,22 @@ public class GameManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    void RpcTestPlaying()
+    void RpcTestPlaying(Test currentTest, int questionNum)
     {
         m_answerSelected = false;
-        Test currentTest = m_currentTestList.GetCurrentTest();
+        
         
         m_currentTest = m_testModules[(int)currentTest.m_type];
         m_currentTest.ActivateScene(true);
         m_currentTest.SetupTest(currentTest);
 
         UpdateQuestion(currentTest.m_question);
-        UpdateQuestion(m_currentTestList.GetCurrentQuestionNumber());
+        UpdateQuestion(questionNum);
     }
 
     [ClientRpc]
     void RpcTestAnswered()
     {
-        m_currentTestList.SetNextTest();
         m_currentTest.ActivateScene(false);
     }
 
@@ -398,17 +377,6 @@ public class GameManager : NetworkBehaviour
         {
             m_hud.AddStar(roundWinnerId);
         }
-        m_currentTestList.SetTestsForNextRound();
-    }
-
-    // This is used to check if there is one or fewer tanks remaining and thus the round should end.
-    private bool OneTankLeft()
-    {
-        // Start the count of tanks left at zero.
-        int numTanksLeft = 0;
-
-        // If there are one or fewer tanks remaining return true, otherwise return false.
-        return numTanksLeft <= 1;
     }
 
 
@@ -476,50 +444,22 @@ public class GameManager : NetworkBehaviour
         return uniqueScore ? maxScoredPlayer : INVALID_PLAYER_ID;
     }
 
-
-    // Returns a string of each player's score in their tank's color.
-    private string EndMessage(int waitTime)
-    {
-        // By default, there is no winner of the round so it's a draw.
-        string message = "DRAW!";
-
-
-        // If there is a game winner set the message to say which player has won the game.
-        if (m_GameWinnerId != INVALID_PLAYER_ID)
-        {
-            PlayerManager gameWinner = m_Players[m_GameWinnerId];
-            message = "<color=#" + ColorUtility.ToHtmlStringRGB(gameWinner.m_PlayerColor) + ">" + gameWinner.m_PlayerName + "</color> WINS THE GAME!";
-        }
-        // If there is a winner, change the message to display 'PLAYER #' in their color and a winning message.
-        else if (m_RoundWinnerId != INVALID_PLAYER_ID)
-        {
-            PlayerManager roundWinner = m_Players[m_GameWinnerId];
-            message = "<color=#" + ColorUtility.ToHtmlStringRGB(roundWinner.m_PlayerColor) + ">" + roundWinner.m_PlayerName + "</color> WINS THE ROUND!";
-        }
-
-        // After either the message of a draw or a winner, add some space before the leader board.
-        message += "\n\n";
-
-        // Go through all the tanks and display their scores with their 'PLAYER #' in their color.
-        for (int i = 0; i < m_Players.Count; i++)
-        {
-            message += "<color=#" + ColorUtility.ToHtmlStringRGB(m_Players[i].m_PlayerColor) + ">" + m_Players[i].m_PlayerName + "</color>: " + m_Players[i].m_Wins + " WINS "
-                + (m_Players[i].IsReady() ? "<size=15>READY</size>" : "") + " \n";
-        }
-
-        if (m_GameWinnerId != INVALID_PLAYER_ID)
-            message += "\n\n<size=20 > Return to lobby in " + waitTime + "\nPress Fire to get ready</size>";
-
-        return message;
-    }
-
     public void CheckAnswers()
     {
-        CmdCheckAnswers(m_localPlayerID);
+        if (isServer)
+        {
+            CheckAnswers(m_localPlayerID, m_currentTest.GetCurrentAnswers());
+        }
+        else
+        {
+            ClientAnswerMessage msg = new ClientAnswerMessage(m_localPlayerID, m_currentTest.GetCurrentAnswers());
+            msg.test = "Shit";
+            ShowScreenMessage(msg.ToString());
+            NetworkManager.singleton.client.Send((short)MessageType.ClientAnswer, msg);
+        }
     }
 
-    [Command]
-    public void CmdCheckAnswers(int playerID)
+    private void CheckAnswers(int playerID, int[] currentAnswers)
     {
         if (playerID == m_partialAnsweredPlayerId)
         {
@@ -527,9 +467,7 @@ public class GameManager : NetworkBehaviour
         }
 
         PlayerManager player = m_Players[playerID];
-        Debug.Log("Answered");
-
-        int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers);
+        int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers, currentAnswers);
         player.m_RightAnswers += score;
         m_answerSelected = true;
         ServerUpdateScore();
@@ -540,7 +478,7 @@ public class GameManager : NetworkBehaviour
         }
 
         //partialAnswer
-        if (score != m_currentTestList.GetCurrentTest().m_answers.Count)
+        if (score != m_currentTestList.GetCurrentTest().m_answers.Length)
         {
             if (m_partialAnsweredPlayerId == INVALID_PARTIAL_SELECTED)
             {
@@ -552,12 +490,14 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    //on server
     private void ServerUpdateScore()
     {
-        RpcUpdateScore(m_Players[0].m_RightAnswers, m_Players.Count == 2 ? m_Players[1].m_RightAnswers : 0);
+        RpcUpdateScore(m_Players[0].m_RightAnswers, m_Players.Count == 2 ? m_Players[1].m_RightAnswers : INVALID_SCORE);
     }
 
     //on server
+    [Server]
     public void SetPlayerMessageLocal(int playerID, string message)
     {
         if (m_localPlayerID == playerID)
@@ -676,4 +616,21 @@ public class GameManager : NetworkBehaviour
     }
 
     //END FADE FUNCS
+
+    //START ADDITIONAL HANDLER FUNCS DUE TO UNWORKING COMMAND FUNC
+
+    void OnClientReady(NetworkMessage netMsg)
+    {
+        ClientReadyMessage msg = netMsg.ReadMessage<ClientReadyMessage>();
+        m_Players[msg.ID].m_loadReady = true;
+    }
+
+    void OnClientAnswered(NetworkMessage netMsg)
+    {
+        ClientAnswerMessage msg = netMsg.ReadMessage<ClientAnswerMessage>();
+        ShowScreenMessage(msg.ToString());
+        CheckAnswers(msg.ID, msg.answerList);
+    }
+
+    //END ADDINITONAL HANDLER FUNCS
 }
