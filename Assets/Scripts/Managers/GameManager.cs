@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using UnityEngine.Networking;
 using System.Collections.Generic;
 using Prototype.NetworkLobby;
-
+using System;
 
 public class GameManager : NetworkBehaviour
 {
@@ -13,7 +13,7 @@ public class GameManager : NetworkBehaviour
     static string LOSE_MESSAGE = "YOU LOSE";
     static string DRAW_MESSAGE = "DRAW";
 
-    static public int INVALID_PLAYER_ID = -1;
+    static public short INVALID_PLAYER_ID = -1;
     static private int INVALID_PARTIAL_SELECTED = -1;
     static public int INVALID_SCORE = -1;
     static public GameManager s_Instance;
@@ -25,7 +25,6 @@ public class GameManager : NetworkBehaviour
     public float m_StartDelay = 3f;           // The delay between the start of RoundStarting and RoundPlaying phases.
     public float m_EndDelay = 3f;             // The delay between the end of RoundPlaying and RoundEnding phases.
     public float m_LoadingWaitDelay = 0.1f;           // The delay between the start of RoundStarting and RoundPlaying phases.
-    public float m_ReadyWaitDelay = 0.1f;
 
     [HideInInspector]
     [SyncVar]
@@ -47,7 +46,7 @@ public class GameManager : NetworkBehaviour
     private WaitForSeconds m_EndWait;           // Used to have a delay whilst the round or game ends.
     private int m_RoundWinnerId;          // Reference to the winner of the current round.  Used to make an announcement of who won.
     private int m_GameWinnerId;           // Reference to the winner of the game.  Used to make an announcement of who won.
-    private int m_localPlayerID = INVALID_PLAYER_ID;
+    private short m_localPlayerID = INVALID_PLAYER_ID;
     private List<TestModuleBlock> m_testModules;
     private TestModuleBlock m_currentTest;
     private TestsList m_currentTestList;
@@ -76,7 +75,7 @@ public class GameManager : NetworkBehaviour
         {
             m_type = TestTypes.ARRANGE,
             m_question = "Combine first program correctly",
-            m_answerTime = 15.0f,
+            m_answerTime = 20.0f,
             m_variants = vars1,
             m_answers = answers1
         };
@@ -95,20 +94,15 @@ public class GameManager : NetworkBehaviour
         {
             m_type = TestTypes.ARRANGE,
             m_question = "Piu",
-            m_answerTime = 12.0f,
+            m_answerTime = 20.0f,
             m_variants = vars2,
             m_answers = answers2
         };
 
         m_currentTestList.m_countOfRounds = 2;
         m_currentTestList.m_countQuestionsInRound = 5;
-        for (int i = 0; i < 5; ++i)
-        {
-            m_currentTestList.m_tests.Add(test1);
-            m_currentTestList.m_tests.Add(test2);
-        }
-
-        m_currentTestList.InitTests();
+        m_currentTestList.m_tests.Add(test1);
+        m_currentTestList.m_tests.Add(test2);
     }
 
     [ClientRpc]
@@ -121,7 +115,7 @@ public class GameManager : NetworkBehaviour
 
     private void SetupLocalPlayerID()
     {
-        for (int i = 0; i < m_Players.Count; ++i)
+        for (short i = 0; i < m_Players.Count; ++i)
         {
             if (m_Players[i].m_Setup.isLocalPlayer)
             {
@@ -148,7 +142,6 @@ public class GameManager : NetworkBehaviour
         m_StartWait = new WaitForSeconds(m_StartDelay);
         m_EndWait = new WaitForSeconds(m_EndDelay);
         m_LoadingWait = new WaitForSeconds(m_LoadingWaitDelay);
-        m_ReadyWait = new WaitForSeconds(m_ReadyWaitDelay);
 
         //TODO use Command function
         NetworkServer.RegisterHandler((short)MessageType.ClientReady, OnClientReady);
@@ -206,7 +199,9 @@ public class GameManager : NetworkBehaviour
 
         if (!isServer)
         {
-            NetworkManager.singleton.client.Send((short)MessageType.ClientReady, new ClientReadyMessage(m_localPlayerID));
+            ClientReadyMessage msg = new ClientReadyMessage();
+            msg.ID = m_localPlayerID;
+            NetworkManager.singleton.client.Send((short)MessageType.ClientReady, msg);
         }
         else
         {
@@ -226,7 +221,12 @@ public class GameManager : NetworkBehaviour
             yield return m_LoadingWait;
         }
 
-        Hack_SetupTestList();
+        //Hack_SetupTestList();
+        //TestReader.SaveTestList("test", m_currentTestList);
+
+        m_currentTestList = TestReader.GetTestList("test_f");
+        m_currentTestList.InitTests();
+
         RpcSetupGame(m_currentTestList.m_countOfRounds);
 
         while (m_currentTestList.IsRoundAvaliable())
@@ -452,8 +452,9 @@ public class GameManager : NetworkBehaviour
         }
         else
         {
-            ClientAnswerMessage msg = new ClientAnswerMessage(m_localPlayerID, m_currentTest.GetCurrentAnswers());
-            msg.test = "Shit";
+            ClientAnswerMessage msg = new ClientAnswerMessage();
+            msg.ID = m_localPlayerID;
+            msg.answerList = m_currentTest.GetCurrentAnswers();
             ShowScreenMessage(msg.ToString());
             NetworkManager.singleton.client.Send((short)MessageType.ClientAnswer, msg);
         }
@@ -630,6 +631,7 @@ public class GameManager : NetworkBehaviour
         ClientAnswerMessage msg = netMsg.ReadMessage<ClientAnswerMessage>();
         ShowScreenMessage(msg.ToString());
         CheckAnswers(msg.ID, msg.answerList);
+        
     }
 
     //END ADDINITONAL HANDLER FUNCS

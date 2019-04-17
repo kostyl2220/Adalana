@@ -9,49 +9,14 @@ enum MessageType
     ClientAnswer
 }
 
-public class ClientMessage : MessageBase
+public class ClientReadyMessage : MessageBase
 {
-    public int ID;
-
-    public ClientMessage()
-    {
-
-    }
-
-    public ClientMessage(int id)
-    {
-        ID = id;
-    }
+    public short ID;
 }
 
-
-public class ClientReadyMessage : ClientMessage
+public class ClientAnswerMessage : MessageBase
 {
-    public ClientReadyMessage() { }
-
-    public ClientReadyMessage(int id) : base(id)
-    {
-    }
-}
-
-public class ClientAnswerMessage : ClientMessage
-{
-    public string test;
+    public short ID;
     public int[] answerList;
-
-    public ClientAnswerMessage()
-    {
-    }
-
-    public override string ToString()
-    {
-        return ("ID " + ID + " list " + answerList.ToString() + test);
-    }
-
-    public ClientAnswerMessage(int id, int[] res) 
-    {
-        ID = id;
-        answerList = res;
-    }
 }
 

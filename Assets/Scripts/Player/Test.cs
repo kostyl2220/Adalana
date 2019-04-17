@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,6 +8,20 @@ public enum TestTypes
     ARRANGE
 };
 
+[Serializable]
+public struct Variant
+{
+    public int ID;
+    public string text;
+
+    public Variant(string t, int i)
+    {
+        text = t;
+        ID = i;
+    }
+}
+
+[Serializable]
 public class Test
 {
     public TestTypes m_type; 
@@ -16,14 +31,21 @@ public class Test
     public int[] m_answers;
 }
 
+[Serializable]
 public class TestsList
 {
+    [SerializeField]
     public List<Test> m_tests;
+    [SerializeField]
     public int m_countOfRounds;
+    [SerializeField]
     public int m_countQuestionsInRound;
 
+    [NonSerialized]
     private List<Test> m_leftTests;
+    [NonSerialized]
     private int m_currentRound;
+    [NonSerialized]
     private int m_currentQuestion;
 
     public TestsList()

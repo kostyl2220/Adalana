@@ -1,19 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-
-public struct Variant
-{
-    public int ID;
-    public string text;
-
-    public Variant(string t, int i)
-    {
-        text = t;
-        ID = i;
-    }
-}
 
 public class AnswerInitializer : MonoBehaviour
 {
