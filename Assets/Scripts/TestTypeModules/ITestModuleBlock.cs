@@ -5,9 +5,13 @@ using UnityEngine;
 public abstract class TestModuleBlock : MonoBehaviour
 {
     public GameObject m_testScene;
-    protected IAnswerCheckStrategy m_checkStrategy;
+    public IAnswerCheckStrategy m_checkStrategy;
+    public ITestModule m_testModule;
 
-    public abstract int[] GetCurrentAnswers();
+    public int[] GetCurrentAnswers()
+    {
+        return m_testModule.GetCurrentAnswers();
+    }
 
     public int GetScore(int[] rightAnswers, int[] currentAnswers)
     {

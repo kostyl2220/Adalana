@@ -25,7 +25,20 @@
 			 "text":"Chebu"},
 			{"ID":4,
 			 "text":"Rek"}],
-		 "m_answers":[1,2,3,4]}],
+		 "m_answers":[1,2,3,4]},
+		 {"m_type":1,
+		 "m_question":"Who is the best president?",
+		 "m_answerTime":20.0,
+		 "m_variants":[
+			{"ID":1,
+			 "text":"Gachi"},
+			{"ID":2,
+			 "text":"Ze"},
+			{"ID":3,
+			 "text":"Ricardo"},
+			{"ID":4,
+			 "text":"Poroh"}],
+		 "m_answers":[3, 1]}],
 	"m_countOfRounds":2,
 	"m_countQuestionsInRound":5
 }

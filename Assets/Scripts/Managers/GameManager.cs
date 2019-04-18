@@ -131,7 +131,16 @@ public class GameManager : NetworkBehaviour
         foreach (Transform module in transform)
         {
             ArrangeTestModuleBlock atm = module.GetComponent<ArrangeTestModuleBlock>();
-            m_testModules.Add(atm);
+            if (atm)
+            {
+                m_testModules.Add(atm);
+            }
+
+            CheckTestModuleBlock ctm = module.GetComponent<CheckTestModuleBlock>();
+            if (ctm)
+            {
+                m_testModules.Add(ctm);
+            }
         }
     }
 
@@ -315,7 +324,9 @@ public class GameManager : NetworkBehaviour
         {
             Test currentTest = m_currentTestList.GetCurrentTest();
             RpcTestPlaying(currentTest, m_currentTestList.GetCurrentQuestionNumber());
-
+            m_currentTest = m_testModules[(int)currentTest.m_type];
+            m_currentTest.ActivateScene(true);
+            m_currentTest.SetupTest(currentTest);
             m_answerSelected = false;
             float remainingTime = currentTest.m_answerTime;
             // While there is not one tank left...
@@ -340,9 +351,7 @@ public class GameManager : NetworkBehaviour
         m_answerSelected = false;
         
         
-        m_currentTest = m_testModules[(int)currentTest.m_type];
-        m_currentTest.ActivateScene(true);
-        m_currentTest.SetupTest(currentTest);
+        
 
         UpdateQuestion(currentTest.m_question);
         UpdateQuestion(questionNum);

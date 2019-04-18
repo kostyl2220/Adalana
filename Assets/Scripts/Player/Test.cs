@@ -5,7 +5,8 @@ using UnityEngine;
 
 public enum TestTypes
 {
-    ARRANGE
+    ARRANGE,
+    CHECK
 };
 
 [Serializable]

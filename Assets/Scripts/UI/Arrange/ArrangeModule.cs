@@ -3,8 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ArrangeModule : MonoBehaviour
+public class ArrangeModule : ITestModule
 {
+    public AnswerInitializer m_initializer;
     private List<ArrangeCell> m_cells;
     public ArrangeCell m_instance;
     public int m_countOfCells;
@@ -13,33 +14,34 @@ public class ArrangeModule : MonoBehaviour
     void Start()
     {
         m_cells = new List<ArrangeCell>();
-        //SetupSlots(m_countOfCells);
     }
 
-    public int[] GetCurrentAnswers()
+    public override int[] GetCurrentAnswers()
     {
         List<int> answers = new List<int>();
-        foreach(var cell in m_cells)
+        for (int i = 0; i < m_countOfCells; ++i)
         {
+            ArrangeCell cell = m_cells[i];
             answers.Add((cell && cell.GetCurrentItem()) ? cell.GetCurrentItem().ID : -1);
         }
         return answers.ToArray();
     }
 
-    public void SetupSlots(int count)
+    public override void SetupSlots(int count)
     {
-        while (m_cells.Count < count)
+        m_countOfCells = count;
+        while (m_cells.Count < m_countOfCells)
         {
             ArrangeCell newCell = Instantiate(m_instance, transform);
             m_cells.Add(newCell);
         }
         
-        for (int i = count; count < m_cells.Count; ++i)
+        for (int i = m_countOfCells; m_countOfCells < m_cells.Count; ++i)
         {
             m_cells[i].gameObject.SetActive(false);
         }
 
-        for (int i = 0; i < count; ++i)
+        for (int i = 0; i < m_countOfCells; ++i)
         {
             m_cells[i].gameObject.SetActive(true);
             m_cells[i].ResetItem();
@@ -62,5 +64,13 @@ public class ArrangeModule : MonoBehaviour
     public List<ArrangeCell> GetCells()
     {
         return m_cells;
+    }
+
+    public override void SetupVariants(Variant[] vars)
+    {
+        if (m_initializer)
+        {
+            m_initializer.SetupVariants(vars);
+        }
     }
 }
