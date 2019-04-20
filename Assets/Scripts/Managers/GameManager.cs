@@ -8,6 +8,7 @@ using System;
 
 public class GameManager : NetworkBehaviour
 {
+    static string FILE_NOT_FOUND = "CAN'T FIND FILE";
     static string PARTIAL_ANSWER_MESSAGE = "PARTIALLY ANSERED";
     static string WIN_MESSAGE = "YOU WIN";
     static string LOSE_MESSAGE = "YOU LOSE";
@@ -20,11 +21,13 @@ public class GameManager : NetworkBehaviour
 
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
     static public List<PlayerManager> m_Players = new List<PlayerManager>();             // A collection of managers for enabling and disabling different aspects of the tanks.
+    static public string m_testListName = "test_f";
 
     public int m_NumRoundsToWin = 5;          // The number of rounds a single player has to win to win the game.
-    public float m_StartDelay = 3f;           // The delay between the start of RoundStarting and RoundPlaying phases.
-    public float m_EndDelay = 3f;             // The delay between the end of RoundPlaying and RoundEnding phases.
+    public float m_RoundStartDelay = 0.5f;           // The delay between the start of RoundStarting and RoundPlaying phases.
+    public float m_RoundEndDelay = 0.5f;             // The delay between the end of RoundPlaying and RoundEnding phases.
     public float m_LoadingWaitDelay = 0.1f;           // The delay between the start of RoundStarting and RoundPlaying phases.
+    public float m_endGameWaitingTime = 3.0f;
 
     [HideInInspector]
     [SyncVar]
@@ -40,17 +43,17 @@ public class GameManager : NetworkBehaviour
     public CanvasGroup m_EndRoundScreen;
     public HUD m_hud;
 
-    private WaitForSeconds m_StartWait;         // Used to have a delay whilst the round starts.
+    private WaitForSeconds m_RoundStartWait;         // Used to have a delay whilst the round starts.
     private WaitForSeconds m_LoadingWait;
-    private WaitForSeconds m_ReadyWait;
-    private WaitForSeconds m_EndWait;           // Used to have a delay whilst the round or game ends.
+    private WaitForSeconds m_RoundEndWait;           // Used to have a delay whilst the round or game ends.
     private int m_RoundWinnerId;          // Reference to the winner of the current round.  Used to make an announcement of who won.
     private int m_GameWinnerId;           // Reference to the winner of the game.  Used to make an announcement of who won.
     private short m_localPlayerID = INVALID_PLAYER_ID;
+
     private List<TestModuleBlock> m_testModules;
     private TestModuleBlock m_currentTest;
     private TestsList m_currentTestList;
-    private int m_addedPlayers = 0;
+
 
     void Awake()
     {
@@ -148,8 +151,8 @@ public class GameManager : NetworkBehaviour
     private void Start()
     {
         // Create the delays so they only have to be made once.
-        m_StartWait = new WaitForSeconds(m_StartDelay);
-        m_EndWait = new WaitForSeconds(m_EndDelay);
+        m_RoundStartWait = new WaitForSeconds(m_RoundStartDelay);
+        m_RoundEndWait = new WaitForSeconds(m_RoundEndDelay);
         m_LoadingWait = new WaitForSeconds(m_LoadingWaitDelay);
 
         //TODO use Command function
@@ -233,7 +236,13 @@ public class GameManager : NetworkBehaviour
         //Hack_SetupTestList();
         //TestReader.SaveTestList("test", m_currentTestList);
 
-        m_currentTestList = TestReader.GetTestList("test_f");
+        m_currentTestList = TestReader.GetTestList(m_testListName);
+        if (m_currentTestList == null)
+        {
+            RpcShowMessageAll(FILE_NOT_FOUND);
+            yield return new WaitForSeconds(m_endGameWaitingTime);
+            LobbyManager.s_Singleton.ServerReturnToLobby();
+        }
         m_currentTestList.InitTests();
 
         RpcSetupGame(m_currentTestList.m_countOfRounds);
@@ -252,41 +261,8 @@ public class GameManager : NetworkBehaviour
 
         m_GameWinnerId = GetGameWinnerId();
         RpcEndGame(m_GameWinnerId);
-
-        // This code is not run until 'RoundEnding' has finished.  At which point, check if there is a winner of the game.
-        if (m_GameWinnerId != INVALID_PLAYER_ID)
-        {// If there is a game winner, wait for certain amount or all player confirmed to start a game again
-            m_GameIsFinished = true;
-            float leftWaitTime = 15.0f;
-            bool allAreReady = false;
-            int flooredWaitTime = 15;
-
-            while (leftWaitTime > 0.0f && !allAreReady)
-            {
-                yield return null;
-
-                allAreReady = true;
-                foreach (var tmp in m_Players)
-                {
-                    allAreReady &= tmp.IsReady();
-                }
-
-                leftWaitTime -= Time.deltaTime;
-
-                int newFlooredWaitTime = Mathf.FloorToInt(leftWaitTime);
-
-                if (newFlooredWaitTime != flooredWaitTime)
-                {
-                    flooredWaitTime = newFlooredWaitTime;
-                }
-            }
-
-            LobbyManager.s_Singleton.ServerReturnToLobby();
-        }
-        else
-        {
-            StartCoroutine(GameLoop());
-        }
+        yield return new WaitForSeconds(m_endGameWaitingTime);
+        LobbyManager.s_Singleton.ServerReturnToLobby();
     }
 
     private bool AllPlayersReady()
@@ -308,7 +284,7 @@ public class GameManager : NetworkBehaviour
         RpcRoundStarting(m_currentTestList.GetCurrentRound());
 
         // Wait for the specified length of time until yielding control back to the game loop.
-        yield return m_StartWait;
+        yield return m_RoundStartWait;
     }
 
     [ClientRpc]
@@ -324,9 +300,7 @@ public class GameManager : NetworkBehaviour
         {
             Test currentTest = m_currentTestList.GetCurrentTest();
             RpcTestPlaying(currentTest, m_currentTestList.GetCurrentQuestionNumber());
-            m_currentTest = m_testModules[(int)currentTest.m_type];
-            m_currentTest.ActivateScene(true);
-            m_currentTest.SetupTest(currentTest);
+
             m_answerSelected = false;
             float remainingTime = currentTest.m_answerTime;
             // While there is not one tank left...
@@ -348,10 +322,9 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     void RpcTestPlaying(Test currentTest, int questionNum)
     {
-        m_answerSelected = false;
-        
-        
-        
+        m_currentTest = m_testModules[(int)currentTest.m_type];
+        m_currentTest.ActivateScene(true);
+        m_currentTest.SetupTest(currentTest);
 
         UpdateQuestion(currentTest.m_question);
         UpdateQuestion(questionNum);
@@ -376,7 +349,7 @@ public class GameManager : NetworkBehaviour
         RpcRoundEnding(m_RoundWinnerId);
 
         // Wait for the specified length of time until yielding control back to the game loop.
-        yield return m_EndWait;
+        yield return m_RoundEndWait;
     }
 
     [ClientRpc]
@@ -453,22 +426,6 @@ public class GameManager : NetworkBehaviour
         return uniqueScore ? maxScoredPlayer : INVALID_PLAYER_ID;
     }
 
-    public void CheckAnswers()
-    {
-        if (isServer)
-        {
-            CheckAnswers(m_localPlayerID, m_currentTest.GetCurrentAnswers());
-        }
-        else
-        {
-            ClientAnswerMessage msg = new ClientAnswerMessage();
-            msg.ID = m_localPlayerID;
-            msg.answerList = m_currentTest.GetCurrentAnswers();
-            ShowScreenMessage(msg.ToString());
-            NetworkManager.singleton.client.Send((short)MessageType.ClientAnswer, msg);
-        }
-    }
-
     private void CheckAnswers(int playerID, int[] currentAnswers)
     {
         if (playerID == m_partialAnsweredPlayerId)
@@ -496,7 +453,7 @@ public class GameManager : NetworkBehaviour
             }
             m_partialAnsweredPlayerId = playerID;
             RpcSetPartialAnswer(playerID);
-            SetPlayerMessageLocal(playerID, PARTIAL_ANSWER_MESSAGE);
+            RpcSetPlayerMessageLocal(playerID, PARTIAL_ANSWER_MESSAGE);
         }
     }
 
@@ -507,23 +464,13 @@ public class GameManager : NetworkBehaviour
     }
 
     //on server
-    [Server]
-    public void SetPlayerMessageLocal(int playerID, string message)
+    [ClientRpc]
+    public void RpcSetPlayerMessageLocal(int playerID, string message)
     {
         if (m_localPlayerID == playerID)
         {
             ShowScreenMessage(message);
         }
-        else
-        {
-            ClientShowScreenMessage(message);
-        }
-    }
-
-    [Client]
-    void ClientShowScreenMessage(string message)
-    {
-        ShowScreenMessage(PARTIAL_ANSWER_MESSAGE);
     }
 
     private void ResetAll()
@@ -535,11 +482,41 @@ public class GameManager : NetworkBehaviour
         ServerUpdateScore();
     }
 
+    //BEGIN BUTTON PRESS FUNCS
+
+    public void QuitGameButtonPressed()
+    {
+        LobbyManager.s_Singleton.ServerReturnToLobby();
+    }
+
+    public void CheckAnswersButtonPressed()
+    {
+        if (isServer)
+        {
+            CheckAnswers(m_localPlayerID, m_currentTest.GetCurrentAnswers());
+        }
+        else
+        {
+            ClientAnswerMessage msg = new ClientAnswerMessage();
+            msg.ID = m_localPlayerID;
+            msg.answerList = m_currentTest.GetCurrentAnswers();
+            NetworkManager.singleton.client.Send((short)MessageType.ClientAnswer, msg);
+        }
+    }
+
+    //END BUTTON PRESS FUNCS
+
     //BEGIN HUD FUNCTIONS
 
     void ShowScreenMessage(string message)
     {
         m_hud.ShowScreenMessage(message);
+    }
+
+    [ClientRpc]
+    private void RpcShowMessageAll(string reason)
+    {
+        ShowScreenMessage(reason);
     }
 
     [ClientRpc]
@@ -591,7 +568,7 @@ public class GameManager : NetworkBehaviour
     private IEnumerator ClientRoundStartingFade()
     {
         float elapsedTime = 0.0f;
-        float wait = m_StartDelay - 0.5f;
+        float wait = m_RoundStartDelay - 0.5f;
 
         yield return null;
 
@@ -615,7 +592,7 @@ public class GameManager : NetworkBehaviour
     private IEnumerator ClientRoundEndingFade()
     {
         float elapsedTime = 0.0f;
-        float wait = m_EndDelay;
+        float wait = m_RoundEndDelay;
         while (elapsedTime < wait)
         {
             m_EndRoundScreen.alpha = (elapsedTime / wait);
@@ -638,7 +615,6 @@ public class GameManager : NetworkBehaviour
     void OnClientAnswered(NetworkMessage netMsg)
     {
         ClientAnswerMessage msg = netMsg.ReadMessage<ClientAnswerMessage>();
-        ShowScreenMessage(msg.ToString());
         CheckAnswers(msg.ID, msg.answerList);
         
     }

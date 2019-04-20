@@ -30,7 +30,7 @@ public class HUD : MonoBehaviour
     {
         if (m_screenMessage)
         {
-            m_screenMessage.SetText(message);
+            m_screenMessage.ShowMessage(message);
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,9 +33,11 @@ public class CheckModule : ITestModule
 
     public override void SetupVariants(Variant[] variants)
     {
-        for (int i = 0; i < variants.Length; ++i)
+        System.Random rnd = new System.Random();
+        Variant[] copy = (new List<Variant>(variants)).OrderBy(x => rnd.Next()).ToArray();
+        for (int i = 0; i < copy.Length; ++i)
         {
-            m_buttons[i].SetAnswer(variants[i]);
+            m_buttons[i].SetAnswer(copy[i]);
         }
     }
 

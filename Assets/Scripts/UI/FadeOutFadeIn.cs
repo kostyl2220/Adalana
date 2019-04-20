@@ -16,7 +16,7 @@ public class FadeOutFadeIn : MonoBehaviour
         transform.localScale = Vector3.zero;
     }
 
-    public void SetText(string text)
+    public void ShowMessage(string text)
     {
         m_text.text = text;
         StartFade();

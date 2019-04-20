@@ -5,8 +5,8 @@ using UnityEngine;
 
 public class TestReader 
 {
-    static string TEST_FOLDER = "Tests";
-    static string JSON_TYPE = ".json";
+    public static string TEST_FOLDER = "Tests";
+    public static string JSON_TYPE = ".json";
 
     public static TestsList GetTestList(string fileName)
     {
@@ -34,6 +34,11 @@ public class TestReader
 
     private static string GetFullPath(string fileName)
     {
-        return Path.Combine(Path.Combine(Application.dataPath, TEST_FOLDER), fileName) + JSON_TYPE;
+        return Path.Combine(GetTestFolderPath(), fileName) + JSON_TYPE;
+    }
+
+    public static string GetTestFolderPath()
+    {
+        return Path.Combine(Application.dataPath, TEST_FOLDER);
     }
 }
