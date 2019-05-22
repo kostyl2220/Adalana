@@ -5,6 +5,8 @@ using UnityEngine.Networking;
 using System.Collections.Generic;
 using Prototype.NetworkLobby;
 using System;
+using PlayFab.ClientModels;
+using PlayFab;
 
 public class GameManager : NetworkBehaviour
 {
@@ -13,6 +15,11 @@ public class GameManager : NetworkBehaviour
     static string WIN_MESSAGE = "YOU WIN";
     static string LOSE_MESSAGE = "YOU LOSE";
     static string DRAW_MESSAGE = "DRAW";
+
+    static string PLAYFAB_WIN_COUNT = "WinCount";
+    static string PLAYFAB_LOSE_COUNT = "LoseCount";
+    static string PLAYFAB_DRAW_COUNT = "DrawCount";
+    static string PLAYFAB_TOTAL_POINTS = "TotalPoints";
 
     static public short INVALID_PLAYER_ID = -1;
     static private int INVALID_PARTIAL_SELECTED = -1;
@@ -120,7 +127,7 @@ public class GameManager : NetworkBehaviour
     {
         for (short i = 0; i < m_Players.Count; ++i)
         {
-            if (m_Players[i].m_Setup.isLocalPlayer)
+            if (m_Players[i].IsLocalPlayer())
             {
                 m_localPlayerID = i;
                 return;
@@ -171,19 +178,17 @@ public class GameManager : NetworkBehaviour
     /// <param name="c">The color of the player, choosen in the lobby</param>
     /// <param name="name">The name of the Player, choosen in the lobby</param>
     /// <param name="localID">The localID. e.g. if 2 player are on the same machine this will be 1 & 2</param>
-    static public void AddPlayer(GameObject tank, int playerNum, Color c, string name, int localID)
+    static public void AddPlayer(GameObject tank, int playerNum, string name)
     {
         PlayerManager tmp = new PlayerManager();
         tmp.m_Instance = tank;
         tmp.m_PlayerNumber = playerNum;
-        tmp.m_PlayerColor = c;
         tmp.m_PlayerName = name;
-        tmp.m_LocalPlayerID = localID;
         tmp.Setup();
         m_Players.Add(tmp);
     }
 
-    public void RemoveTank(GameObject tank)
+    public void RemovePlayer(GameObject tank)
     {
         PlayerManager toRemove = null;
         foreach (var tmp in m_Players)
@@ -261,6 +266,7 @@ public class GameManager : NetworkBehaviour
 
         m_GameWinnerId = GetGameWinnerId();
         RpcEndGame(m_GameWinnerId);
+        UpdatePlayfabScore();
         yield return new WaitForSeconds(m_endGameWaitingTime);
         LobbyManager.s_Singleton.ServerReturnToLobby();
     }
@@ -395,10 +401,13 @@ public class GameManager : NetworkBehaviour
         if (winnerId == INVALID_PLAYER_ID)
         {
             ShowScreenMessage(DRAW_MESSAGE);
+            UpdatePlayerStatistics(PLAYFAB_DRAW_COUNT);
         }
         else
         {
-            ShowScreenMessage(winnerId == m_localPlayerID ? WIN_MESSAGE : LOSE_MESSAGE);
+            var isWinner = winnerId == m_localPlayerID;
+            ShowScreenMessage(isWinner ? WIN_MESSAGE : LOSE_MESSAGE);
+            UpdatePlayerStatistics(isWinner ? PLAYFAB_WIN_COUNT : PLAYFAB_LOSE_COUNT);
         }
     }
 
@@ -424,7 +433,7 @@ public class GameManager : NetworkBehaviour
 
         // If no tanks have enough rounds to win, return null.
         return uniqueScore ? maxScoredPlayer : INVALID_PLAYER_ID;
-    }
+    }  
 
     private void CheckAnswers(int playerID, int[] currentAnswers)
     {
@@ -435,7 +444,7 @@ public class GameManager : NetworkBehaviour
 
         PlayerManager player = m_Players[playerID];
         int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers, currentAnswers);
-        player.m_RightAnswers += score;
+        player.AddScore(score);
         m_answerSelected = true;
         ServerUpdateScore();
 
@@ -477,7 +486,7 @@ public class GameManager : NetworkBehaviour
     {
         foreach(var player in m_Players)
         {
-            player.m_RightAnswers = 0;
+            player.Reset();
         }
         ServerUpdateScore();
     }
@@ -615,9 +624,44 @@ public class GameManager : NetworkBehaviour
     void OnClientAnswered(NetworkMessage netMsg)
     {
         ClientAnswerMessage msg = netMsg.ReadMessage<ClientAnswerMessage>();
-        CheckAnswers(msg.ID, msg.answerList);
-        
+        CheckAnswers(msg.ID, msg.answerList);      
     }
 
     //END ADDINITONAL HANDLER FUNCS
+
+    //START PLAYFAB FUNCS
+
+    private void UpdatePlayfabScore()
+    {
+        int[] results = new int[m_Players.Count];
+        for (int i = 0; i < m_Players.Count; ++i)
+        {
+            results[i] = m_Players[i].m_totalScore;
+        }
+        RpcUpdatePlayfabScore(results);
+    }
+
+    [ClientRpc]
+    private void RpcUpdatePlayfabScore(int[] scores)
+    {
+        int localScore = scores[m_localPlayerID];
+        UpdatePlayerStatistics(PLAYFAB_TOTAL_POINTS, localScore);
+    }
+
+    private void UpdatePlayerStatistics(string statistics, int value = 1)
+    {
+        var request = new UpdatePlayerStatisticsRequest
+        {
+            // request.Statistics is a list, so multiple StatisticUpdate objects can be defined if required.
+            Statistics = new List<StatisticUpdate> {
+                new StatisticUpdate { StatisticName = statistics, Value = value },
+            }
+        };
+
+        PlayFabClientAPI.UpdatePlayerStatistics(request,
+            result => { Debug.Log("User statistics updated"); },
+            error => { Debug.LogError(error.GenerateErrorReport()); });
+    }
+
+    //END PLAYFAB FUNCS
 }

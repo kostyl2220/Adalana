@@ -22,8 +22,8 @@ namespace Prototype.NetworkLobby
             ipInput.onEndEdit.RemoveAllListeners();
             ipInput.onEndEdit.AddListener(onEndEditIP);
 
-            matchNameInput.onEndEdit.RemoveAllListeners();
-            matchNameInput.onEndEdit.AddListener(onEndEditGameName);
+            //matchNameInput.onEndEdit.RemoveAllListeners();
+            //matchNameInput.onEndEdit.AddListener(onEndEditGameName);
         }
 
         public void OnClickHost()
@@ -42,6 +42,11 @@ namespace Prototype.NetworkLobby
             lobbyManager.DisplayIsConnecting();
 
             lobbyManager.SetServerInfo("Connecting...", lobbyManager.networkAddress);
+        }
+
+        public void OnPlaySolo()
+        {
+            lobbyManager.PlaySolo();
         }
 
         public void OnClickDedicated()

@@ -382,6 +382,20 @@ namespace Prototype.NetworkLobby
             ServerChangeScene(playScene);
         }
 
+        public void PlaySolo()
+        {
+            if (_lobbyHooks)
+            {
+                NetworkLobbyPlayer lobbyPlayer = Instantiate(lobbyPlayerPrefab);
+                lobbyPlayer.slot = 0;
+                LobbyPlayer lp = lobbyPlayer.GetComponent<LobbyPlayer>();
+                lp.nameInput.text = "LocalPlayer";
+                GameObject gamePlayer = Instantiate(gamePlayerPrefab);
+                _lobbyHooks.OnLobbyServerSceneLoadedForPlayer(this, lobbyPlayer.gameObject, gamePlayer);
+                ServerChangeScene(playScene);
+            }
+        }
+
         // ----------------- Client callbacks ------------------
 
         public override void OnClientConnect(NetworkConnection conn)

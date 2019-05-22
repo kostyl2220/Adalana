@@ -8,8 +8,7 @@ public class PlayerManager
     // It works with the GameManager class to control how the tanks behave
     // and whether or not players have control of their tank in the 
     // different phases of the game.
-
-    public Color m_PlayerColor;               // This is the color this tank will be tinted.
+    
     [HideInInspector]
     public int m_PlayerNumber;                // This specifies which player this the manager for.
     [HideInInspector]
@@ -19,12 +18,12 @@ public class PlayerManager
     [HideInInspector]
     public int m_Wins;                        // The number of wins this player has so far.
     [HideInInspector]
-    public string m_PlayerName;                    // The player name set in the lobby
-    [HideInInspector]
-    public int m_LocalPlayerID;                    // The player localID (if there is more than 1 player on the same machine)
+    public string m_PlayerName;                    // The player name set in the lobby    
 
     [HideInInspector]
     public bool m_loadReady = false;
+
+    public int m_totalScore;
 
     public PlayerSetup m_Setup;
 
@@ -33,30 +32,31 @@ public class PlayerManager
         // Get references to the components.
         m_Setup = m_Instance.GetComponent<PlayerSetup>();
 
-        m_Setup.m_Color = m_PlayerColor;
+        m_totalScore = 0;
+        m_RightAnswers = 0;
         m_Setup.m_PlayerName = m_PlayerName;
         m_Setup.m_PlayerNumber = m_PlayerNumber;
-        m_Setup.m_LocalID = m_LocalPlayerID;
     }
 
     public string GetName()
     {
-        return m_Setup.m_PlayerName;
+        return m_PlayerName;
     }
 
-    public void SetLeader(bool leader)
+    public bool IsLocalPlayer()
     {
-        m_Setup.SetLeader(leader);
+        return m_Setup.isLocalPlayer;
     }
 
-    public bool IsReady()
+    public void AddScore(int score)
     {
-        return m_Setup.m_IsReady;
+        m_totalScore += score;
+        m_RightAnswers = score;
     }
 
     // Used at the start of each round to put the tank into it's default state.
     public void Reset()
     {
-
+        m_RightAnswers = 0;
     }
 }

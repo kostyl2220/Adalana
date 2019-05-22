@@ -36,7 +36,7 @@ public class TankSetup : NetworkBehaviour
         base.OnStartClient();
 
         if (!isServer) //if not hosting, we had the tank to the gamemanger for easy access!
-            GameManager.AddPlayer(gameObject, m_PlayerNumber, m_Color, m_PlayerName, m_LocalID);
+            GameManager.AddPlayer(gameObject, m_PlayerNumber, m_PlayerName);
 
         GameObject m_TankRenderers = transform.Find("TankRenderers").gameObject;
 
@@ -99,6 +99,6 @@ public class TankSetup : NetworkBehaviour
 
     public override void OnNetworkDestroy()
     {
-        GameManager.s_Instance.RemoveTank(gameObject);
+        GameManager.s_Instance.RemovePlayer(gameObject);
     }
 }
