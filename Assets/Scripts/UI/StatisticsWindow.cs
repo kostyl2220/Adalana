@@ -8,28 +8,24 @@ public class StatisticsWindow : MonoBehaviour
 {
     public static Dictionary<string, string> statistics =
     new Dictionary<string, string> {
-       { "WinCount", "Wins" },
-       { "LoseCount", "Loses" },
-       { "DrawCount", "Draws" },
-       { "TotalPoints", "Right answers"},
-       { "LostPoints", "Wrong answers"},
+       { "1WinCount", "Wins" },
+       { "2LoseCount", "Loses" },
+       { "3DrawCount", "Draws" },
+       { "4TotalPoints", "Right answers"},
+       { "5LostPoints", "Wrong answers"},
     };
 
-    public static string[] sumValues = { "WinCount", "LoseCount", "DrawCount" };
+    public static string[] sumValues = { "1WinCount", "2LoseCount", "3DrawCount" };
 
     public static string TOTAL_GAMES = "Played games";
 
     public GameObject m_mainMenu;
     public GameObject m_loadingText;
+    public GameObject m_leaderboard;
     public StatisticsField m_field;
     public Transform m_statArea;
 
     private List<StatisticsField> m_stats = new List<StatisticsField>();
-    // Start is called before the first frame update
-    void Start()
-    {
-        Debug.Log("Hello");
-    }
 
     private void OnEnable()
     {
@@ -45,7 +41,16 @@ public class StatisticsWindow : MonoBehaviour
         }
     }
 
-    public void OnResetPlayerStatistics()
+    public void OnLeaderboard()
+    {
+        if (m_leaderboard)
+        {
+            m_leaderboard.SetActive(true);
+            gameObject.SetActive(false);
+        }
+    }
+
+    public static void OnSetupPlayerStatistics()
     {
         var statisticList = new List<StatisticUpdate>();
         foreach (var value in statistics.Keys)
@@ -55,7 +60,7 @@ public class StatisticsWindow : MonoBehaviour
 
         var request = new UpdatePlayerStatisticsRequest { Statistics = statisticList };
         PlayFabClientAPI.UpdatePlayerStatistics(request,
-            result => { ReadStatistics(); },
+            result => { },
             error => { Debug.LogError(error.GenerateErrorReport()); });
     }
 
@@ -73,6 +78,18 @@ public class StatisticsWindow : MonoBehaviour
             OnGetStatistics,
             error => Debug.LogError(error.GenerateErrorReport())
         );
+    }
+
+    public void ResetStatistics()
+    {
+        var request = new PlayFab.AdminModels.ResetUserStatisticsRequest
+        {
+            PlayFabId = GameManager.m_playfabID
+        };
+
+        PlayFabAdminAPI.ResetUserStatistics(request,
+            result => { ReadStatistics(); },
+            error => { Debug.LogError(error.GenerateErrorReport()); });
     }
 
     void OnGetStatistics(GetPlayerStatisticsResult result)
@@ -95,9 +112,13 @@ public class StatisticsWindow : MonoBehaviour
         }
 
         AddStatisticsField(TOTAL_GAMES, totalGameCount);
+        result.Statistics.Sort((StatisticValue val1, StatisticValue val2) => { return val1.StatisticName.CompareTo(val2.StatisticName); });
         foreach (var eachStat in result.Statistics)
         {
-            AddStatisticsField(statistics[eachStat.StatisticName], eachStat.Value);
+            if (statistics.ContainsKey(eachStat.StatisticName))
+            {
+                AddStatisticsField(statistics[eachStat.StatisticName], eachStat.Value);
+            }
         }
     }
 
@@ -107,11 +128,5 @@ public class StatisticsWindow : MonoBehaviour
         field.SetName(name);
         field.SetValue(value.ToString());
         m_stats.Add(field);
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

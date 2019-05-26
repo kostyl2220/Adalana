@@ -5,13 +5,16 @@ using UnityEngine.UI;
 
 public class StatisticsField : MonoBehaviour
 {
+    public Text m_number;
     public Text m_statName;
     public Text m_statValue;
 
-    // Start is called before the first frame update
-    void Start()
+    public void SetNumber(int number)
     {
-        
+        if (m_number)
+        {
+            m_number.text = number + ".";
+        }
     }
 
     public void SetName(string name)
@@ -28,11 +31,5 @@ public class StatisticsField : MonoBehaviour
         {
             m_statValue.text = value;
         }
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

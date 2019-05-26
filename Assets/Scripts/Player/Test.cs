@@ -33,10 +33,28 @@ public class Test
 }
 
 [Serializable]
+public class TestInfo
+{
+    [SerializeField]
+    public string m_name;
+
+    [SerializeField]
+    public int m_totalCount;
+
+    [SerializeField]
+    public int m_rounds;
+
+    [SerializeField]
+    public int m_countInRound;
+}
+
+[Serializable]
 public class TestsList
 {
     [SerializeField]
     public List<Test> m_tests;
+    [SerializeField]
+    public string m_name;
     [SerializeField]
     public int m_countOfRounds;
     [SerializeField]

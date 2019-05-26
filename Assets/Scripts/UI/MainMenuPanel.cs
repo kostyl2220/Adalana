@@ -5,22 +5,46 @@ using UnityEngine;
 public class MainMenuPanel : MonoBehaviour
 {
     public GameObject m_statisticsPanel;
+    public GameObject m_playPanel;
+    public RadialProgress m_progressBar;
+    public GameObject m_testCreator;
+
+    private void OnEnable()
+    {
+        if (m_progressBar)
+        {
+            m_progressBar.Activate();
+        }
+    }
 
     public void OnStaticstics()
     {
-        m_statisticsPanel.SetActive(true);
-        gameObject.SetActive(false);
+        if (m_statisticsPanel)
+        {
+            m_statisticsPanel.SetActive(true);
+            gameObject.SetActive(false);
+        }
     }
 
-    // Start is called before the first frame update
-    void Start()
+    public void OnTestCreator()
     {
-        
+        if (m_testCreator)
+        {
+            m_testCreator.SetActive(true);
+            if (m_progressBar)
+            {
+                m_progressBar.gameObject.SetActive(false);
+            }
+            gameObject.SetActive(false);
+        }
     }
 
-    // Update is called once per frame
-    void Update()
+    public void OnPlay()
     {
-        
+        if (m_playPanel)
+        {
+            m_playPanel.SetActive(true);
+            gameObject.SetActive(false);
+        }
     }
 }

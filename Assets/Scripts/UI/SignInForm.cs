@@ -1,8 +1,12 @@
 ﻿using PlayFab;
 using PlayFab.ClientModels;
+using Prototype.NetworkLobby;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 
 public class SignInForm : MonoBehaviour
@@ -27,12 +31,20 @@ public class SignInForm : MonoBehaviour
     public void OnSignIn()
     {
         Debug.Log("TrySingIn");
-        var request = new LoginWithPlayFabRequest { Username = m_login.text, Password = m_password.text };
+        var request = new LoginWithPlayFabRequest {
+            InfoRequestParameters = new GetPlayerCombinedInfoRequestParams { GetPlayerStatistics = true },
+            Username = m_login.text, Password = m_password.text };
+        LobbyManager.m_playerName = m_login.text;
         PlayFabClientAPI.LoginWithPlayFab(request, OnSignInSuccess, OnSignInFailure);
     }
 
     private void OnSignInSuccess(LoginResult result)
     {
+        GameManager.m_playfabID = result.PlayFabId;
+        var stat = result.InfoResultPayload.PlayerStatistics.Find((StatisticValue sv) => { return sv.StatisticName == GameManager.PLAYFAB_TOTAL_POINTS; });
+        GameManager.m_experience = stat.Value;
+        m_mainPanel.gameObject.SetActive(true);
+        m_mainPanel.gameObject.SetActive(false);
         m_mainPanel.gameObject.SetActive(true);
         m_registrationForm.SetActive(false);
     }

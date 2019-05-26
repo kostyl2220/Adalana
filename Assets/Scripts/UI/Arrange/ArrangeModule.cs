@@ -36,7 +36,7 @@ public class ArrangeModule : ITestModule
             m_cells.Add(newCell);
         }
         
-        for (int i = m_countOfCells; m_countOfCells < m_cells.Count; ++i)
+        for (int i = m_countOfCells; i < m_cells.Count; ++i)
         {
             m_cells[i].gameObject.SetActive(false);
         }

@@ -16,10 +16,12 @@ public class GameManager : NetworkBehaviour
     static string LOSE_MESSAGE = "YOU LOSE";
     static string DRAW_MESSAGE = "DRAW";
 
-    static string PLAYFAB_WIN_COUNT = "WinCount";
-    static string PLAYFAB_LOSE_COUNT = "LoseCount";
-    static string PLAYFAB_DRAW_COUNT = "DrawCount";
-    static string PLAYFAB_TOTAL_POINTS = "TotalPoints";
+    static string PLAYFAB_LOSE_COUNT = "2LoseCount";
+    static string PLAYFAB_DRAW_COUNT = "3DrawCount";
+    public static string PLAYFAB_WIN_COUNT = "1WinCount";
+    public static string PLAYFAB_TOTAL_POINTS = "4TotalPoints";
+    public static string PLAYFAB_LOST_POINTS = "4LostPoints";
+    public static string PLAYFAB_LAST_LOG_IN = "LastLogIn";
 
     static public short INVALID_PLAYER_ID = -1;
     static private int INVALID_PARTIAL_SELECTED = -1;
@@ -29,6 +31,8 @@ public class GameManager : NetworkBehaviour
     //this is static so tank can be added even withotu the scene loaded (i.e. from lobby)
     static public List<PlayerManager> m_Players = new List<PlayerManager>();             // A collection of managers for enabling and disabling different aspects of the tanks.
     static public string m_testListName = "test_f";
+    static public string m_playfabID;
+    static public int m_experience;
 
     public int m_NumRoundsToWin = 5;          // The number of rounds a single player has to win to win the game.
     public float m_RoundStartDelay = 0.5f;           // The delay between the start of RoundStarting and RoundPlaying phases.
@@ -48,6 +52,7 @@ public class GameManager : NetworkBehaviour
     [Header("UI")]
     public CanvasGroup m_FadingScreen;
     public CanvasGroup m_EndRoundScreen;
+    public ResultsWindow m_resultScreen;
     public HUD m_hud;
 
     private WaitForSeconds m_RoundStartWait;         // Used to have a delay whilst the round starts.
@@ -59,8 +64,16 @@ public class GameManager : NetworkBehaviour
 
     private List<TestModuleBlock> m_testModules;
     private TestModuleBlock m_currentTest;
+    private Test m_test;
     private TestsList m_currentTestList;
 
+    private void OnEnable()
+    {
+        if (m_resultScreen)
+        {
+            m_resultScreen.gameObject.SetActive(false);
+        }
+    }
 
     void Awake()
     {
@@ -90,7 +103,7 @@ public class GameManager : NetworkBehaviour
             m_answers = answers1
         };
 
-        Variant[] vars2 = 
+        Variant[] vars2 =
         {
              new Variant("Lol", 1)
             , new Variant("Kek", 2)
@@ -240,7 +253,7 @@ public class GameManager : NetworkBehaviour
 
         //Hack_SetupTestList();
         //TestReader.SaveTestList("test", m_currentTestList);
-
+        //PlayFab.Internal.
         m_currentTestList = TestReader.GetTestList(m_testListName);
         if (m_currentTestList == null)
         {
@@ -268,7 +281,7 @@ public class GameManager : NetworkBehaviour
         RpcEndGame(m_GameWinnerId);
         UpdatePlayfabScore();
         yield return new WaitForSeconds(m_endGameWaitingTime);
-        LobbyManager.s_Singleton.ServerReturnToLobby();
+        ShowResultScreen();
     }
 
     private bool AllPlayersReady()
@@ -304,11 +317,11 @@ public class GameManager : NetworkBehaviour
     {     
         while (m_currentTestList.HasValidQuestionForRound())
         {
-            Test currentTest = m_currentTestList.GetCurrentTest();
-            RpcTestPlaying(currentTest, m_currentTestList.GetCurrentQuestionNumber());
+            m_test = m_currentTestList.GetCurrentTest();
+            RpcTestPlaying(m_test, m_currentTestList.GetCurrentQuestionNumber());
 
             m_answerSelected = false;
-            float remainingTime = currentTest.m_answerTime;
+            float remainingTime = m_test.m_answerTime;
             // While there is not one tank left...
             while (remainingTime > 0 && !m_answerSelected)
             {
@@ -344,6 +357,10 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator RoundEnding()
     {
+        foreach (var player in m_Players)
+        {
+            player.RoundEnded();
+        }
         // See if there is a winner now the round is over.
         m_RoundWinnerId = GetRoundWinnerId();
         // If there is a winner, increment their score.
@@ -442,9 +459,16 @@ public class GameManager : NetworkBehaviour
             return;
         }
 
+        if (m_test == null)
+        {
+            return;
+        }
+
         PlayerManager player = m_Players[playerID];
-        int score = m_currentTest.GetScore(m_currentTestList.GetCurrentTest().m_answers, currentAnswers);
+        int score = m_currentTest.GetScore(m_test.m_answers, currentAnswers);
+        var lostedScore = m_test.m_answers.Length - score;
         player.AddScore(score);
+        player.AddLostedScore(lostedScore);
         m_answerSelected = true;
         ServerUpdateScore();
 
@@ -454,7 +478,7 @@ public class GameManager : NetworkBehaviour
         }
 
         //partialAnswer
-        if (score != m_currentTestList.GetCurrentTest().m_answers.Length)
+        if (lostedScore > 0)
         {
             if (m_partialAnsweredPlayerId == INVALID_PARTIAL_SELECTED)
             {
@@ -634,21 +658,26 @@ public class GameManager : NetworkBehaviour
     private void UpdatePlayfabScore()
     {
         int[] results = new int[m_Players.Count];
+        int[] lostedResults = new int[m_Players.Count];
         for (int i = 0; i < m_Players.Count; ++i)
         {
             results[i] = m_Players[i].m_totalScore;
+            lostedResults[i] = m_Players[i].m_lostedScore;
         }
-        RpcUpdatePlayfabScore(results);
+        RpcUpdatePlayfabScore(results, lostedResults);
     }
 
     [ClientRpc]
-    private void RpcUpdatePlayfabScore(int[] scores)
+    private void RpcUpdatePlayfabScore(int[] scores, int[]lostedScores)
     {
         int localScore = scores[m_localPlayerID];
+        int lostedScore = lostedScores[m_localPlayerID];
+        m_experience += localScore;
         UpdatePlayerStatistics(PLAYFAB_TOTAL_POINTS, localScore);
+        UpdatePlayerStatistics(PLAYFAB_LOST_POINTS, lostedScore);
     }
 
-    private void UpdatePlayerStatistics(string statistics, int value = 1)
+    public static void UpdatePlayerStatistics(string statistics, int value = 1)
     {
         var request = new UpdatePlayerStatisticsRequest
         {
@@ -664,4 +693,16 @@ public class GameManager : NetworkBehaviour
     }
 
     //END PLAYFAB FUNCS
+
+    private void ShowResultScreen()
+    {
+        RpcShowResulScreen(m_Players[0].m_resultList.ToArray(), (m_Players.Count > 1 ? m_Players[0].m_resultList.ToArray() : new int[2]), m_Players.Count > 1, m_Players[0].m_PlayerName, (m_Players.Count > 1 ? m_Players[1].m_PlayerName : ""));
+    }
+
+    [ClientRpc]
+    void RpcShowResulScreen(int[] results1, int[] results2, bool coop, string fName, string sName)
+    {
+        m_resultScreen.SetResutInfo(results1, results2, coop, fName, sName);
+        m_resultScreen.gameObject.SetActive(true);
+    }
 }

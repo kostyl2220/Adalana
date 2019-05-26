@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -24,15 +25,19 @@ public class PlayerManager
     public bool m_loadReady = false;
 
     public int m_totalScore;
+    public int m_lostedScore;
 
     public PlayerSetup m_Setup;
+    public List<int> m_resultList = new List<int>();
 
     public void Setup()
     {
         // Get references to the components.
         m_Setup = m_Instance.GetComponent<PlayerSetup>();
 
+        m_resultList.Clear();
         m_totalScore = 0;
+        m_lostedScore = 0;
         m_RightAnswers = 0;
         m_Setup.m_PlayerName = m_PlayerName;
         m_Setup.m_PlayerNumber = m_PlayerNumber;
@@ -51,7 +56,17 @@ public class PlayerManager
     public void AddScore(int score)
     {
         m_totalScore += score;
-        m_RightAnswers = score;
+        m_RightAnswers += score;
+    }
+
+    public void AddLostedScore(int score)
+    {
+        m_lostedScore += score;
+    }
+
+    public void RoundEnded()
+    {
+        m_resultList.Add(m_RightAnswers);
     }
 
     // Used at the start of each round to put the tank into it's default state.

@@ -30,7 +30,7 @@ public class AnswerInitializer : MonoBehaviour
             m_variants.Add(newVariant);
         }
 
-        for (int i = count; count < m_variants.Count; ++i)
+        for (int i = count; i < m_variants.Count; ++i)
         {
             m_variants[i].gameObject.SetActive(false);
         }

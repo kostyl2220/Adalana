@@ -50,7 +50,7 @@ public class CheckModule : ITestModule
             m_buttons.Add(newCell);
         }
 
-        for (int i = count; count < m_buttons.Count; ++i)
+        for (int i = count; i < m_buttons.Count; ++i)
         {
             m_buttons[i].gameObject.SetActive(false);
         }

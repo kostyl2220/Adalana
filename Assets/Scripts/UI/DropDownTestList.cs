@@ -6,16 +6,26 @@ using UnityEngine.UI;
 
 public class DropDownTestList : MonoBehaviour
 {
-    private Dropdown m_dropdown; 
+    public Dropdown m_dropdown; 
 
     // Start is called before the first frame update
     void Start()
     {
-        m_dropdown = gameObject.GetComponent<Dropdown>();
+        if (!m_dropdown)
+        {
+            m_dropdown = gameObject.GetComponent<Dropdown>();
+        }
+        if (m_dropdown)
+        {
+            m_dropdown.onValueChanged.AddListener(delegate { OnValueChanged(); });
+        }
+    }
+
+    private void OnEnable()
+    {
         if (m_dropdown)
         {
             InitTests();
-            m_dropdown.onValueChanged.AddListener(delegate { OnValueChanged(); });
         }
     }
 

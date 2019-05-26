@@ -12,9 +12,16 @@ namespace Prototype.NetworkLobby
 
         public RectTransform playerListContentTransform;
         public GameObject warningDirectPlayServer;
+        public GameObject m_startScreen;
 
         protected VerticalLayoutGroup _layout;
         protected List<LobbyPlayer> _players = new List<LobbyPlayer>();
+
+        public void OnBack()
+        {
+            m_startScreen.SetActive(true);
+            gameObject.SetActive(false);
+        }
 
         public void OnEnable()
         {
@@ -32,9 +39,6 @@ namespace Prototype.NetworkLobby
         {
             //this dirty the layout to force it to recompute evryframe (a sync problem between client/server
             //sometime to child being assigned before layout was enabled/init, leading to broken layouting)
-            
-            if(_layout)
-                _layout.childAlignment = Time.frameCount%2 == 0 ? TextAnchor.UpperCenter : TextAnchor.UpperLeft;
         }
 
         public void AddPlayer(LobbyPlayer player)

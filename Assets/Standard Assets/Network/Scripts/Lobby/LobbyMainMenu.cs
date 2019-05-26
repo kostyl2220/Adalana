@@ -1,6 +1,7 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using UnityEngine.Networking;
 
 namespace Prototype.NetworkLobby
 {
@@ -8,96 +9,69 @@ namespace Prototype.NetworkLobby
     public class LobbyMainMenu : MonoBehaviour 
     {
         public LobbyManager lobbyManager;
+        public GameObject m_prevPanel;
+        public GameObject m_progressBar;
 
-        public RectTransform lobbyServerList;
         public RectTransform lobbyPanel;
 
-        public InputField ipInput;
-        public InputField matchNameInput;
+        public Dropdown ipInput;
+
+        private bool m_gameInited = false;
 
         public void OnEnable()
         {
+            LobbyManager.m_playSolo = false;
             lobbyManager.topPanel.ToggleVisibility(true);
-            
-            ipInput.onEndEdit.RemoveAllListeners();
-            ipInput.onEndEdit.AddListener(onEndEditIP);
-
-            //matchNameInput.onEndEdit.RemoveAllListeners();
-            //matchNameInput.onEndEdit.AddListener(onEndEditGameName);
+            if (m_gameInited)
+            {
+                m_gameInited = false;
+                NetworkManager.singleton.StopClient();
+                NetworkManager.singleton.StopHost();
+                NetworkManager.singleton.StopMatchMaker();
+            }
         }
 
         public void OnClickHost()
         {
+            m_gameInited = true;
             lobbyManager.StartHost();
+            DisableMenuScene();
+        }
+
+        private void DisableMenuScene()
+        {
+            gameObject.SetActive(false);
+            if (m_progressBar)
+            {
+                m_progressBar.SetActive(false);
+            }
         }
 
         public void OnClickJoin()
         {
             lobbyManager.ChangeTo(lobbyPanel);
 
-            lobbyManager.networkAddress = ipInput.text;
+            lobbyManager.networkAddress = LobbyManager.m_selectedEnemy;
             lobbyManager.StartClient();
 
-            lobbyManager.backDelegate = lobbyManager.StopClientClbk;
-            lobbyManager.DisplayIsConnecting();
-
-            lobbyManager.SetServerInfo("Connecting...", lobbyManager.networkAddress);
+            DisableMenuScene();
         }
 
         public void OnPlaySolo()
         {
-            lobbyManager.PlaySolo();
+            m_gameInited = true;
+            LobbyManager.m_playSolo = true;
+            lobbyManager.StartHost();
+            DisableMenuScene();
         }
 
-        public void OnClickDedicated()
+        public void OnBack()
         {
-            lobbyManager.ChangeTo(null);
-            lobbyManager.StartServer();
-
-            lobbyManager.backDelegate = lobbyManager.StopServerClbk;
-
-            lobbyManager.SetServerInfo("Dedicated Server", lobbyManager.networkAddress);
-        }
-
-        public void OnClickCreateMatchmakingGame()
-        {
-            lobbyManager.StartMatchMaker();
-            lobbyManager.matchMaker.CreateMatch(
-                matchNameInput.text,
-                (uint)lobbyManager.maxPlayers,
-                true,
-				"", "", "", 0, 0,
-				lobbyManager.OnMatchCreate);
-
-            lobbyManager.backDelegate = lobbyManager.StopHost;
-            lobbyManager._isMatchmaking = true;
-            lobbyManager.DisplayIsConnecting();
-
-            lobbyManager.SetServerInfo("Matchmaker Host", lobbyManager.matchHost);
-        }
-
-        public void OnClickOpenServerList()
-        {
-            lobbyManager.StartMatchMaker();
-            lobbyManager.backDelegate = lobbyManager.SimpleBackClbk;
-            lobbyManager.ChangeTo(lobbyServerList);
-        }
-
-        void onEndEditIP(string text)
-        {
-            if (Input.GetKeyDown(KeyCode.Return))
+            if (m_prevPanel)
             {
-                OnClickJoin();
+                m_prevPanel.SetActive(true);
+                gameObject.SetActive(false);
             }
         }
-
-        void onEndEditGameName(string text)
-        {
-            if (Input.GetKeyDown(KeyCode.Return))
-            {
-                OnClickCreateMatchmakingGame();
-            }
-        }
-
     }
 }

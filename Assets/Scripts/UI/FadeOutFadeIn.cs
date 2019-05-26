@@ -23,7 +23,8 @@ public class FadeOutFadeIn : MonoBehaviour
     }
 
     private void StartFade()
-    {      
+    {
+        StopAllCoroutines();
         StartCoroutine(RunFades());
     }
 
