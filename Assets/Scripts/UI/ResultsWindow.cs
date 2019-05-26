@@ -19,7 +19,7 @@ public class ResultsWindow : MonoBehaviour
 
     public void ToMainMenu()
     {
-        LobbyManager.s_Singleton.ServerReturnToLobby();
+        LobbyManager.s_Singleton.SendReturnToLobby();
     }
 
     public void SetResutInfo(int[] results0, int[] results1, bool multiplayer, string fName, string sName)

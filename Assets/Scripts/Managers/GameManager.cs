@@ -696,7 +696,7 @@ public class GameManager : NetworkBehaviour
 
     private void ShowResultScreen()
     {
-        RpcShowResulScreen(m_Players[0].m_resultList.ToArray(), (m_Players.Count > 1 ? m_Players[0].m_resultList.ToArray() : new int[2]), m_Players.Count > 1, m_Players[0].m_PlayerName, (m_Players.Count > 1 ? m_Players[1].m_PlayerName : ""));
+        RpcShowResulScreen(m_Players[0].m_resultList.ToArray(), (m_Players.Count > 1 ? m_Players[1].m_resultList.ToArray() : new int[2]), m_Players.Count > 1, m_Players[0].m_PlayerName, (m_Players.Count > 1 ? m_Players[1].m_PlayerName : ""));
     }
 
     [ClientRpc]
