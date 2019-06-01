@@ -28,9 +28,4 @@ public class RadialFill : MonoBehaviour
         fillImage.fillAmount = fillPercentage;
         displayText.text = currentValue + "/" + maxValue;
     }
-
-    protected void Start()
-    {
-        SetCurrentValue(0, maxValue);
-    }
 }

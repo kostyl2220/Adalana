@@ -41,18 +41,19 @@ public class ResultsWindow : MonoBehaviour
             }
             else
             {
+                res[0]++;
                 AddResult(-1, results0[i], i);
             }
         }
-        SetupResult(res);
+        SetupResult(res, multiplayer);
         m_firstPlayer.text = fName;
         m_seondPlayer.text = sName;
         EnableCoop(multiplayer);
     }
 
-    private void SetupResult(int[] res)
+    private void SetupResult(int[] res, bool multiplayer)
     {
-        if (res.Length == 1)
+        if (!multiplayer)
         {
             m_results.text = res[0].ToString();
         }
